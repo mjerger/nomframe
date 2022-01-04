@@ -18,16 +18,37 @@ const char* methods[8] { "ANY", "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE",
 
 ESP8266WebServer server(80);
 
+class CRGB {
+ public:
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  CRGB() {}
+  CRGB(uint8_t r, uint8_t g, uint8_t b) {
+    this->r = r;
+    this->g = g;
+    this->b = b;
+  }
+};
 
-const int led = LED_BUILTIN;
+bool readyToSend = true;
+
+#define NUM_LEDS 50
+CRGB leds[NUM_LEDS];
+
+#define REQ_PIN 5 //D1
+#define CLK_PIN 4 //D2
+#define DAT_PIN 0 //D3
+
+#define LED_DELAY 300
 
 
 void errorLoop() {
   while (true) {
     for (int i=0; i<3; i++) {
-      digitalWrite(led, LOW);
+      digitalWrite(LED_BUILTIN, LOW);
       delay(100);
-      digitalWrite(led, HIGH);
+      digitalWrite(LED_BUILTIN, HIGH);
       delay(100);
     }
     delay(1000);
@@ -109,11 +130,51 @@ bool sendJson(DynamicJsonDocument json)
 }
 
 
+void handleLEDs()
+{
+  if (digitalRead(REQ_PIN) == LOW && readyToSend) {
+    static uint8_t clk = 0;
+    static uint8_t color = 0;
+
+    digitalWrite(CLK_PIN, clk);  
+    for (uint32_t l=0; l<NUM_LEDS; l++) {
+      color = leds[l].r;
+      for (uint8_t i=0; i<8; i++) {
+        digitalWrite(DAT_PIN, (color >> i) & 1);
+        clk = 1-clk;
+        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
+        digitalWrite(CLK_PIN, clk);
+        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
+      }
+      color = leds[l].g;
+      for (uint8_t i=0; i<8; i++) {
+        digitalWrite(DAT_PIN, (color >> i) & 1);
+        clk = 1-clk;
+        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
+        digitalWrite(CLK_PIN, clk);
+        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
+      }
+      color = leds[l].b;
+      for (uint8_t i=0; i<8; i++) {
+        digitalWrite(DAT_PIN, (color >> i) & 1);
+        clk = 1-clk;
+        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
+        digitalWrite(CLK_PIN, clk);
+        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
+      }
+    }
+  }
+}
+
 void setup(void)
 {
-  pinMode(led, OUTPUT);
-  digitalWrite(led, LOW);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
   
+  pinMode(REQ_PIN, INPUT_PULLUP);
+  pinMode(CLK_PIN, OUTPUT);
+  pinMode(DAT_PIN, OUTPUT);
+
   Serial.begin(9600);
   delay(500);
   Serial.println("\n\n--------------");
@@ -163,10 +224,19 @@ void setup(void)
   
   server.begin();
   Serial.println("HTTP server started");
+
+
+  for (int i=0; i<NUM_LEDS; i++) {
+    leds[i] = CRGB(0xAA,0xAA,0xAA);
+  }
+  leds[0] = CRGB(255,0,0);
+  leds[1] = CRGB(0,255,0);
+  leds[2] = CRGB(0,0,255);
 }
 
 void loop(void)
 {
   server.handleClient();
   MDNS.update();
+  handleLEDs();
 }

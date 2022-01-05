@@ -1,3 +1,5 @@
+
+
 /* 
  *  16*16 pixel led wifi interface
  */
@@ -9,40 +11,49 @@
 #include <FS.h>
 #include <ArduinoJson.h>
 #include <base64.h>
+#include <uptime.h>
+#include <uptime_formatter.h>
+#include <time.h>
+
+// WIFI HTTP server
 
 const char *ssid = "2rw";
 const char *password = "Handschuhfachbeleuchtungsschalter";
 const char *mdnsHostname = "nomframe";
-
-const char* methods[8] { "ANY", "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" };
-
+const String methods[8] { "ANY", "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" };
 ESP8266WebServer server(80);
 
-class CRGB {
- public:
+// NTP
+
+#define MY_NTP_SERVER "at.pool.ntp.org"           
+#define MY_TZ "CET-1CEST,M3.5.0,M10.5.0/3"   
+time_t now;
+tm tm;
+const String weekdays[7] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+
+// LED strip interface
+
+struct CRGB {
   uint8_t r;
   uint8_t g;
   uint8_t b;
-  CRGB() {}
-  CRGB(uint8_t r, uint8_t g, uint8_t b) {
-    this->r = r;
-    this->g = g;
-    this->b = b;
-  }
+  CRGB() : r(0), g(0), b(0){}
+  CRGB(uint8_t all) : r(all), g(all), b(all) {}
+  CRGB(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
 };
 
-bool readyToSend = true;
-
-#define NUM_LEDS 50
+#define NUM_LEDS 120
 CRGB leds[NUM_LEDS];
 
 #define REQ_PIN 5 //D1
 #define CLK_PIN 4 //D2
 #define DAT_PIN 0 //D3
 
-#define LED_DELAY 300
+#define LED_DELAY_PRE  100
+#define LED_DELAY_POST 150
 
 
+// Loop and blink forever
 void errorLoop() {
   while (true) {
     for (int i=0; i<3; i++) {
@@ -56,24 +67,21 @@ void errorLoop() {
 }
 
 
+// The content types we serve
 String getContentType(String filename)
 {
   if (filename.endsWith(".html") || filename.endsWith(".htm")) return "text/html";
   else if (filename.endsWith(".css")) return "text/css";
-  else if (filename.endsWith(".js")) return "application/javascript";
+  else if (filename.endsWith(".js"))  return "application/javascript";
   else if (filename.endsWith(".ico")) return "image/x-icon";
+  else if (filename.endsWith(".png")) return "image/png";
   return "text/plain";
 }
 
 
-
 // Send file from FS back
-bool handleFile()
+bool handleFile(String path)
 {  
-  String path = server.uri();
-  
-  if(path.endsWith("/")) path += "index.htm";
-  
   String contentType = getContentType(path);
   String pathWithGz = path + ".gz";
 
@@ -105,20 +113,35 @@ bool handleREST()
   if (path == "list")
   {  
     if (method == HTTP_GET) {
-      // TODO read all animations
+      // TODO list /animations directory and generate json
       json["hello"] = "world";
       return sendJson(json);
     }
-  } else if (path.startsWith("ani/")) {
-    int pos = path.lastIndexOf("/");
-    String name = path.substring(pos+1);
-    if (name.length() > 0) {
-      json["name"] = name;
-      return sendJson(json);
-    }
+  } else if (path == String("sysinfo")) {
+    // Uptime
+    json["uptime"] = uptime_formatter::getUptime();
+
+    // NTP time
+    time(&now);
+    localtime_r(&now, &tm);
+    json["datetime"] = weekdays[tm.tm_wday] + " " + leadingZero(tm.tm_mday) + "." + leadingZero(tm.tm_mon+1) + "." + String(tm.tm_year + 1900) + " " + leadingZero(tm.tm_hour) + ":" + leadingZero(tm.tm_min) + ":" + leadingZero(tm.tm_sec);
+    json["dst"] = tm.tm_isdst;
+    // Network info
+    json["ssid"] = String(ssid);
+    json["hostname"] = String(mdnsHostname);
+    json["ip"] = WiFi.localIP();
+    
+    
+    return sendJson(json);
   }
 
   return false;
+}
+
+String leadingZero(int num)
+{
+  if (num < 10) return "0" + String(num);
+  return String(num);
 }
 
 bool sendJson(DynamicJsonDocument json)
@@ -130,39 +153,35 @@ bool sendJson(DynamicJsonDocument json)
 }
 
 
+uint8_t flip = 0;
+
 void handleLEDs()
 {
-  if (digitalRead(REQ_PIN) == LOW && readyToSend) {
+  if (digitalRead(REQ_PIN) == LOW) {
     static uint8_t clk = 0;
     static uint8_t color = 0;
 
-    digitalWrite(CLK_PIN, clk);  
-    for (uint32_t l=0; l<NUM_LEDS; l++) {
-      color = leds[l].r;
+    digitalWrite(CLK_PIN, clk);
+    for (uint32_t b=0; b<NUM_LEDS*3; b++) {
+      
+      color = ((uint8_t*)&leds)[b];
       for (uint8_t i=0; i<8; i++) {
         digitalWrite(DAT_PIN, (color >> i) & 1);
         clk = 1-clk;
-        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
+        
+        for (uint32_t i=0; i<LED_DELAY_PRE; i++) __asm__("nop\n\t");
+        
         digitalWrite(CLK_PIN, clk);
-        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
-      }
-      color = leds[l].g;
-      for (uint8_t i=0; i<8; i++) {
-        digitalWrite(DAT_PIN, (color >> i) & 1);
-        clk = 1-clk;
-        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
-        digitalWrite(CLK_PIN, clk);
-        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
-      }
-      color = leds[l].b;
-      for (uint8_t i=0; i<8; i++) {
-        digitalWrite(DAT_PIN, (color >> i) & 1);
-        clk = 1-clk;
-        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
-        digitalWrite(CLK_PIN, clk);
-        for (uint32_t i=0; i<LED_DELAY; i++) {__asm__("nop\n\t"); }
+        
+        for (uint32_t i=0; i<LED_DELAY_POST; i++) __asm__("nop\n\t");
       }
     }
+
+      leds[3] = CRGB(flip);
+    leds[4] = CRGB(flip < 128 ? 255 : 0);
+    if (flip < 255) flip++;
+    else flip=0;
+  
   }
 }
 
@@ -205,16 +224,19 @@ void setup(void)
   Serial.println(WiFi.localIP());
 
   // Start MSDN responder
-  if (MDNS.begin("nomframe")) {
-    Serial.println("MDNS responder started: nomframe.local");
+  if (MDNS.begin(mdnsHostname)) {
+    Serial.println("MDNS responder started: " + String(mdnsHostname) + ".local");
   }
 
   // Handle requests
+  server.on("/", HTTP_GET, []() { handleFile ("/index.htm"); } );
+  server.on("/create", HTTP_GET, []() { handleFile ("/create.htm"); } );
+  
   server.onNotFound([]() {
     Serial.print(methods[server.method()]);
     Serial.print(" " + server.uri() + " ... ");
     
-    if (handleREST() || handleFile()) {
+    if (handleREST() || handleFile(server.uri())) {
       Serial.println("ok");
     } else {
       Serial.println("not found");
@@ -234,9 +256,12 @@ void setup(void)
   leds[2] = CRGB(0,0,255);
 }
 
+
 void loop(void)
 {
   server.handleClient();
   MDNS.update();
+
+  // TODO prepare next frame here
   handleLEDs();
 }

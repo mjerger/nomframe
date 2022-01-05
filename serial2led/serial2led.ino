@@ -8,7 +8,7 @@
 #define DAT_PIN 2
 #define LED_PIN 3
 
-#define NUM_LEDS 50
+#define NUM_LEDS 120
 CRGB leds[NUM_LEDS];
 
 volatile unsigned long timer0_millis = 0;
@@ -19,11 +19,15 @@ void setup()
   pinMode(REQ_PIN, OUTPUT);
   pinMode(CLK_PIN, INPUT_PULLUP);
   pinMode(DAT_PIN, INPUT_PULLUP);
-
-  delay(1000);
   
+  digitalWrite(REQ_PIN, HIGH);
+
   FastLED.addLeds<WS2811, LED_PIN, GRB>(leds, NUM_LEDS);
   FastLED.setBrightness(64);
+
+  for (int i=0; i<NUM_LEDS; i++) leds[i] = CRGB::Black;
+  leds[0] = CRGB::White;
+  FastLED.show();
 }
 
 

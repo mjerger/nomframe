@@ -1,4 +1,38 @@
   <script>
+    var play = function(animationName) {
+      var json = { "action" : "play", "animation" : animationName };
+      sendJson("/r/action", json);
+    }
+    var updateList = function() {
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                var json = JSON.parse(this.responseText);
+                $("#animations").empty();
+                for (var key in json) {
+                  var name = key.replace(/\.[^/.]+$/, "");
+                  var size = json[key];
+                  $("#animations").append('\
+                  <tr> \
+                    <th scope="row">' + name + '</th> \
+                    <td>' + size + '</td> \
+                    <td class="text-end"> \
+                      <a class="btn btn-primary mx-1" href="animations/edit#' + name + '" role="button">Edit</button> \
+                      <a class="btn btn-primary mx-1 play " data-name="' + name + '" href="#" role="button">Play</button> \
+                    </td> \
+                  </tr>');
+                }
+                $(".play").click(function() {
+                  play($(this).data("name"));
+                });
+            }
+        };
+        xmlhttp.open("GET", "/r/animations", true);
+        xmlhttp.send();
+      }
+    $(document).ready( function() {
+      updateList();
+    });
   </script>
   <br>
   <main class="container">
@@ -11,30 +45,11 @@
                 <th scope="col">Name</th>
                 <th scope="col">Size</th>
                 <th scope="col"></th>
-                <th scope="col"></th>
               </tr>
             </thead>
             <tbody id="animations">
-              <tr>
-                <th scope="row">Fancy Animation 1</th>
-                <td>465b</td>
-                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
-                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
-              </tr>
-              <tr>
-                <th scope="row">Fancy Animation 2</th>
-                <td>465b</td>
-                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
-                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
-              </tr>
-              <tr>
-                <th scope="row">Fancy Animation 3</th>
-                <td>465b</td>
-                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
-                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
-              </tr>
             </tbody>
           </table>
-          <a class="btn btn-primary" href="/animations/create" role="button">Create New &raquo;</a>
+          <a class="btn btn-primary" href="/animations/edit" role="button">Create New &raquo;</a>
       </div>
   </main>

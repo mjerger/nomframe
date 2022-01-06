@@ -8,6 +8,8 @@ footer=`pwd`/_footer.template
 # go through all templates and append/prepend header and footer
 #
 
+date +"%H:%M:%S"
+
 for file in *.template;
 do
   if [[ $file != \_* ]];
@@ -15,6 +17,6 @@ do
     name=${file%.*}
     out_file=$out_dir/$name.html
     cat $header $file $footer > $out_file
-    echo "$name --> $out_file"
+    echo "$name --> $out_file" `du -b $out_file  | cut -f1`
   fi
 done

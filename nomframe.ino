@@ -110,6 +110,7 @@ bool handleFile(String path)
 }
 
 
+// Handle the /r rest endpoints
 bool handleREST()
 {
   if (!server.uri().startsWith("/r/")) return false;
@@ -118,15 +119,74 @@ bool handleREST()
   HTTPMethod method = server.method();
 
   DynamicJsonDocument json(10000);
-  
-  if (path == "list") 
+
+// FILES - list all files
+  if (path == "files") 
   {  
     if (method == HTTP_GET) {
-      // TODO list /animations directory and generate json
-      json["hello"] = "world";
+      Dir dir = SPIFFS.openDir("/");
+      while (dir.next()) {
+        json[dir.fileName().substring(3)] = dir.fileSize();
+      }
       return sendJson(json);
     }
-  } else if (path == String("sysinfo"))
+  }
+// ANIMATIONS - list all animations
+  else if (path == "animations") 
+  {  
+    if (method == HTTP_GET) {
+      Dir dir = SPIFFS.openDir("/a/");
+      while (dir.next()) {
+        json[dir.fileName().substring(3)] = dir.fileSize();
+      }
+      return sendJson(json);
+    }
+  }
+// PATTERNS - list all patterns
+  else if (path == "patterns") 
+  {  
+    if (method == HTTP_GET) {
+      Dir dir = SPIFFS.openDir("/p/");
+      while (dir.next()) {
+        json[dir.fileName()] = dir.fileSize();
+      }
+      return sendJson(json);
+    }
+  }
+// ACTIONS - perform various actions
+  else if (path == String("action"))
+  {
+    const char* plain = "plain";
+    const char* action = "action";
+    const char* animation = "animation";
+    const char* pattern = "pattern";
+    
+    if (method == HTTP_POST && server.hasArg(plain)) {
+      deserializeJson(json, server.arg(plain));
+      if (json.containsKey(action)) {
+        String action = json[action];
+        
+        if (action == "play")
+        {
+          if (json.containsKey(animation)) {
+            String animation = json[animation];
+            // TODO play animation
+            return sendOK();
+          } else if (json.containsKey(pattern)) {
+            String pattern = json[pattern];
+            // TODO play pattern
+            return sendOK();
+          }
+        }
+        else if (action == "reboot")
+        {
+          ESP.restart();
+        }
+        
+      }
+    }
+  }
+  else if (path == String("sysinfo"))
   {
     // Uptime
     json["uptime"] = uptime_formatter::getUptime();
@@ -153,10 +213,10 @@ bool handleREST()
     json["fs_free"]  = String(double(fs_info.totalBytes - fs_info.usedBytes) / 1024.0, 1) + "k";
     json["fs_used"]  = String((double)fs_info.usedBytes / 1024.0, 1) + "k";
     json["fs_total"] = String((double)fs_info.totalBytes / 1024.0, 1) + "k";
-    json["fs_blockSize"]     = fs_info.blockSize;
-    json["fs_pageSize"]      = fs_info.pageSize;
-    json["fs_maxOpenFiles"]  = fs_info.maxOpenFiles;
-    json["fs_maxPathLength"] = fs_info.maxPathLength;
+    //json["fs_blockSize"]     = fs_info.blockSize;
+    //json["fs_pageSize"]      = fs_info.pageSize;
+    //json["fs_maxOpenFiles"]  = fs_info.maxOpenFiles;
+    //json["fs_maxPathLength"] = fs_info.maxPathLength;
 
     // LEDs
     String colors;
@@ -182,6 +242,12 @@ bool sendJson(DynamicJsonDocument json)
   String string;
   serializeJson(json, string);
   server.send(200, "application/json", string);
+  return true;
+}
+
+bool sendOK()
+{
+  server.send(200);
   return true;
 }
 
@@ -226,7 +292,7 @@ void setup(void)
   pinMode(CLK_PIN, OUTPUT);
   pinMode(DAT_PIN, OUTPUT);
 
-  Serial.begin(9600);
+  Serial.begin(115200);
   delay(500);
   Serial.println("\n\n--------------");
   Serial.println(" nomframe 1.0");
@@ -261,11 +327,11 @@ void setup(void)
   }
 
   // Handle requests
-  server.on("/",                  HTTP_GET, []() { handleFile ("/home.html"); } );
-  server.on("/animations",        HTTP_GET, []() { handleFile ("/animations.html"); } );
-  server.on("/animations/create", HTTP_GET, []() { handleFile ("/animations-edit.html"); } );
-  server.on("/patterns",          HTTP_GET, []() { handleFile ("/patterns.html"); } );
-  server.on("/patterns/create",   HTTP_GET, []() { handleFile ("/patterns-edit.html"); } );
+  server.on("/",                HTTP_GET, []() { handleFile ("/home.html"); } );
+  server.on("/animations",      HTTP_GET, []() { handleFile ("/animations.html"); } );
+  server.on("/animations/edit", HTTP_GET, []() { handleFile ("/animations-edit.html"); } );
+  server.on("/patterns",        HTTP_GET, []() { handleFile ("/patterns.html"); } );
+  server.on("/patterns/edit",   HTTP_GET, []() { handleFile ("/patterns-edit.html"); } );
   
   server.onNotFound([]() {
     Serial.print(methods[server.method()]);

@@ -126,7 +126,7 @@ bool handleREST()
     if (method == HTTP_GET) {
       Dir dir = SPIFFS.openDir("/");
       while (dir.next()) {
-        json[dir.fileName().substring(3)] = dir.fileSize();
+        json[dir.fileName()] = dir.fileSize();
       }
       return sendJson(json);
     }
@@ -243,6 +243,24 @@ bool sendJson(DynamicJsonDocument json)
   return true;
 }
 
+
+bool handleSaveAnimation()
+{
+  if (server.hasArg("animation") && server.hasArg("name")) {
+    String name = String(server.arg("name"));
+    name.replace(" ", "_");
+    
+    String filename = "/a/" + name + ".lua";
+    File file = SPIFFS.open(filename, "w");
+    file.print(String(server.arg("animation")));
+    file.close();
+
+    return sendRedirect("/animations/edit?a=" + name);
+  }
+  return sendError();
+}
+
+
 bool sendOK()
 {
   server.send(200);
@@ -250,8 +268,20 @@ bool sendOK()
 }
 
 
-uint8_t flip = 0;
+bool sendRedirect(String location)
+{
+  server.sendHeader("Location", location);
+  server.send(303);
+  return true;
+}
 
+bool sendError()
+{
+  server.send(500, "text/plain", "500: Internal Server Error");
+  return true;
+}
+
+uint8_t flip = 0;
 void handleLEDs()
 {
   if (digitalRead(REQ_PIN) == LOW) {
@@ -325,11 +355,12 @@ void setup(void)
   }
 
   // Handle requests
-  server.on("/",                HTTP_GET, []() { handleFile ("/home.html"); } );
-  server.on("/animations",      HTTP_GET, []() { handleFile ("/animations.html"); } );
-  server.on("/animations/edit", HTTP_GET, []() { handleFile ("/animations-edit.html"); } );
-  server.on("/patterns",        HTTP_GET, []() { handleFile ("/patterns.html"); } );
-  server.on("/patterns/edit",   HTTP_GET, []() { handleFile ("/patterns-edit.html"); } );
+  server.on("/",                HTTP_GET,  []() { handleFile ("/home.html"); } );
+  server.on("/animations",      HTTP_GET,  []() { handleFile ("/animations.html"); } );
+  server.on("/animations/edit", HTTP_GET,  []() { handleFile ("/animations-edit.html"); } );
+  server.on("/animations/edit", HTTP_POST, []() { handleSaveAnimation(); });
+  server.on("/patterns",        HTTP_GET,  []() { handleFile ("/patterns.html"); } );
+  server.on("/patterns/edit",   HTTP_GET,  []() { handleFile ("/patterns-edit.html"); } );
   
   server.onNotFound([]() {
     Serial.print(methods[server.method()]);

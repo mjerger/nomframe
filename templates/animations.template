@@ -1,35 +1,29 @@
   <script>
     var play = function(animationName) {
       var json = { "action" : "play", "animation" : animationName };
-      sendJson("/r/action", json);
+      postJson("/r/action", json);
     }
     var updateList = function() {
-        var xmlhttp = new XMLHttpRequest();
-        xmlhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                var json = JSON.parse(this.responseText);
-                $("#animations").empty();
-                for (var key in json) {
-                  var name = key.replace(/\.[^/.]+$/, "");
-                  var size = json[key];
-                  $("#animations").append('\
-                  <tr> \
-                    <th scope="row">' + name + '</th> \
-                    <td>' + size + '</td> \
-                    <td class="text-end"> \
-                      <a class="btn btn-primary mx-1" href="animations/edit#' + name + '" role="button">Edit</button> \
-                      <a class="btn btn-primary mx-1 play " data-name="' + name + '" href="#" role="button">Play</button> \
-                    </td> \
-                  </tr>');
-                }
-                $(".play").click(function() {
-                  play($(this).data("name"));
-                });
-            }
-        };
-        xmlhttp.open("GET", "/r/animations", true);
-        xmlhttp.send();
-      }
+      getJson("/r/animations", function(json) { 
+        $("#animations").empty();
+        for (var key in json) {
+          var name = key.replace(/\.[^/.]+$/, "");
+          var size = json[key];
+          $("#animations").append('\
+          <tr> \
+            <th scope="row">' + name.replace("_", " ") + '</th> \
+            <td>' + size + '</td> \
+            <td class="text-end"> \
+              <a class="btn btn-primary mx-1" href="animations/edit?a=' + name + '" role="button">Edit</button> \
+              <a class="btn btn-primary mx-1 play " data-name="' + name + '" href="#" role="button">Play</button> \
+            </td> \
+          </tr>');
+        }
+        $(".play").click(function() {
+          play($(this).data("name"));
+        });
+      });
+    }
     $(document).ready( function() {
       updateList();
     });
@@ -47,8 +41,7 @@
                 <th scope="col"></th>
               </tr>
             </thead>
-            <tbody id="animations">
-            </tbody>
+            <tbody id="animations"></tbody>
           </table>
           <a class="btn btn-primary" href="/animations/edit" role="button">Create New &raquo;</a>
       </div>

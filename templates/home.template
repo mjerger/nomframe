@@ -1,23 +1,16 @@
     <script>
       var updateSysInfo = function() {
-        var xmlhttp = new XMLHttpRequest();
-        xmlhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                var json = JSON.parse(this.responseText);
-                for (var key in json) {
-                  if (json.hasOwnProperty(key)) {
-                    $("#" + key).text(json[key]);
-                  }
-                }
-
-                for (c=0; c<json.leds.length; c+=6) {
-                  var color = "#" + json.leds.substr(c,6);
-                  $("#"+(c/6)).css("background-color", color);
-                }
+        getJson("/r/sysinfo", function(json) {
+          for (var key in json) {
+            if (json.hasOwnProperty(key)) {
+              $("#" + key).text(json[key]);
             }
-        };
-        xmlhttp.open("GET", "/r/sysinfo", true);
-        xmlhttp.send();
+          }
+          for (c=0; c<json.leds.length; c+=6) {
+            var color = "#" + json.leds.substr(c,6);
+            $("#"+(c/6)).css("background-color", color);
+          }
+        });
       }
       $(document).ready( function() {
         updateSysInfo();
@@ -51,20 +44,6 @@
       </div>
     </main>
     <hr>
-    <style>
-      table#preview tr {
-        height: 40px;
-        margin: 0;
-        padding: 0;
-      }
-      
-      table#preview tr td {
-        width: 40px;
-        height: 40px;
-        margin: 0;
-        padding: 0;
-      }
-    </style>
     <script>
       $(document).ready( function() {
         var i = 0;
@@ -84,9 +63,7 @@
             <h2>Preview</h2>
             <br>
             <p>Currently playing: <span id="cur_playing"></span></p>
-            <table id="preview">
-              
-            </table>
+            <table id="preview"></table>
         </div>
     </main>
 

@@ -45,3 +45,6 @@
         xmlhttp.send(JSON.stringify(json));
       }
     </script>
+    <style>
+      a { color: rgb(33, 37, 41) };
+    </style>

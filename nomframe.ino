@@ -156,31 +156,29 @@ bool handleREST()
 // ACTIONS - perform various actions
   else if (path == String("action"))
   {
-    const char* plain = "plain";
-    const char* action = "action";
-    const char* animation = "animation";
-    const char* pattern = "pattern";
     
-    if (method == HTTP_POST && server.hasArg(plain)) {
-      deserializeJson(json, server.arg(plain));
-      if (json.containsKey(action)) {
-        String action = json[action];
+    if (method == HTTP_POST && server.hasArg("plain")) {
+      deserializeJson(json, server.arg("plain"));
+      if (json.containsKey("action")) {
+        String action = json["action"];
         
         if (action == "play")
         {
-          if (json.containsKey(animation)) {
-            String animation = json[animation];
+          if (json.containsKey("animation")) {
+            String animation = json["animation"];
             // TODO play animation
             return sendOK();
-          } else if (json.containsKey(pattern)) {
-            String pattern = json[pattern];
+          } else if (json.containsKey("pattern")) {
+            String pattern = json["pattern"];
             // TODO play pattern
             return sendOK();
           }
         }
         else if (action == "reboot")
         {
+          delay(500);
           ESP.restart();
+          return sendOK();
         }
         
       }

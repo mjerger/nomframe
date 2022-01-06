@@ -22,6 +22,7 @@
       $(document).ready( function() {
         updateSysInfo();
         setInterval(updateSysInfo, 5000);
+        $("#reboot").click(function() { sendJson("/r/action", { "action" : "reboot" }); });
       });
     </script>
     <main class="container">
@@ -46,6 +47,7 @@
                 </tr>
             </table>
           </div>
+          <p class="text-end"><a href="#" id="reboot">Reboot</a></p>
       </div>
     </main>
     <hr>

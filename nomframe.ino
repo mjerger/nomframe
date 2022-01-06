@@ -40,6 +40,15 @@ struct CRGB {
   CRGB() : r(0), g(0), b(0){}
   CRGB(uint8_t all) : r(all), g(all), b(all) {}
   CRGB(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
+  String toHex() {
+    String cr = String(r, HEX);
+    String cg = String(g, HEX);
+    String cb = String(b, HEX);
+
+    return (cr.length() == 1 ? "0" + cr : cr) + 
+           (cg.length() == 1 ? "0" + cg : cg) + 
+           (cb.length() == 1 ? "0" + cb : cb);
+  }
 };
 
 #define NUM_LEDS 120
@@ -108,29 +117,53 @@ bool handleREST()
   String path = server.uri().substring(3);
   HTTPMethod method = server.method();
 
-  DynamicJsonDocument json(2048);
+  DynamicJsonDocument json(10000);
   
-  if (path == "list")
+  if (path == "list") 
   {  
     if (method == HTTP_GET) {
       // TODO list /animations directory and generate json
       json["hello"] = "world";
       return sendJson(json);
     }
-  } else if (path == String("sysinfo")) {
+  } else if (path == String("sysinfo"))
+  {
     // Uptime
     json["uptime"] = uptime_formatter::getUptime();
 
     // NTP time
     time(&now);
     localtime_r(&now, &tm);
-    json["datetime"] = weekdays[tm.tm_wday] + " " + leadingZero(tm.tm_mday) + "." + leadingZero(tm.tm_mon+1) + "." + String(tm.tm_year + 1900) + " " + leadingZero(tm.tm_hour) + ":" + leadingZero(tm.tm_min) + ":" + leadingZero(tm.tm_sec);
-    json["dst"] = tm.tm_isdst;
-    // Network info
-    json["ssid"] = String(ssid);
-    json["hostname"] = String(mdnsHostname);
-    json["ip"] = WiFi.localIP();
+    json["datetime"] = weekdays[tm.tm_wday]      + " " +
+                       leadingZero(tm.tm_mday)   + "." + 
+                       leadingZero(tm.tm_mon+1)  + "." + 
+                       String(tm.tm_year + 1900) + " " + 
+                       leadingZero(tm.tm_hour)   + ":" + 
+                       leadingZero(tm.tm_min)    + ":" + 
+                       leadingZero(tm.tm_sec);
     
+    // Network
+    json["ssid"] = String(ssid);
+    json["host"] = String(mdnsHostname) + ".local";
+    json["ip"]   = WiFi.localIP();
+    
+    // Filesystem
+    FSInfo fs_info;
+    SPIFFS.info(fs_info);
+    json["fs_free"]  = String(double(fs_info.totalBytes - fs_info.usedBytes) / 1024.0, 1) + "k";
+    json["fs_used"]  = String((double)fs_info.usedBytes / 1024.0, 1) + "k";
+    json["fs_total"] = String((double)fs_info.totalBytes / 1024.0, 1) + "k";
+    json["fs_blockSize"]     = fs_info.blockSize;
+    json["fs_pageSize"]      = fs_info.pageSize;
+    json["fs_maxOpenFiles"]  = fs_info.maxOpenFiles;
+    json["fs_maxPathLength"] = fs_info.maxPathLength;
+
+    // LEDs
+    String colors;
+    for (int l=0; l<NUM_LEDS; l++) {
+      colors = colors + leds[l].toHex();
+    }
+    json["leds"] = colors;
     
     return sendJson(json);
   }
@@ -177,11 +210,10 @@ void handleLEDs()
       }
     }
 
-      leds[3] = CRGB(flip);
+    leds[3] = CRGB(flip);
     leds[4] = CRGB(flip < 128 ? 255 : 0);
     if (flip < 255) flip++;
     else flip=0;
-  
   }
 }
 
@@ -229,8 +261,11 @@ void setup(void)
   }
 
   // Handle requests
-  server.on("/", HTTP_GET, []() { handleFile ("/index.htm"); } );
-  server.on("/create", HTTP_GET, []() { handleFile ("/create.htm"); } );
+  server.on("/",                  HTTP_GET, []() { handleFile ("/home.html"); } );
+  server.on("/animations",        HTTP_GET, []() { handleFile ("/animations.html"); } );
+  server.on("/animations/create", HTTP_GET, []() { handleFile ("/animations-edit.html"); } );
+  server.on("/patterns",          HTTP_GET, []() { handleFile ("/patterns.html"); } );
+  server.on("/patterns/create",   HTTP_GET, []() { handleFile ("/patterns-edit.html"); } );
   
   server.onNotFound([]() {
     Serial.print(methods[server.method()]);

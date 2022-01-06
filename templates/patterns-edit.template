@@ -1,0 +1,9 @@
+  <script>
+  </script>
+  <br>
+  <main class="container">
+      <div class="bg-light p-5">
+          <h2>Edit Pattern <span id="ani_name"></span></h2>
+          <br>
+      </div>
+  </main>

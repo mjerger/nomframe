@@ -1,0 +1,48 @@
+  <script>
+  </script>
+  <br>
+  <main class="container">
+      <div class="bg-light p-5">
+          <h2>Patterns</h2>
+          <br>
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Frames</th>
+                <th scope="col">Length</th>
+                <th scope="col">Size</th>
+                <th scope="col"></th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="patterns">
+              <tr>
+                <th scope="row">Fancy Pattern 1</th>
+                <td>12</td>
+                <td>35s</td>
+                <td>465b</td>
+                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
+                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
+              </tr>
+              <tr>
+                <th scope="row">Fancy Pattern 2</th>
+                <td>12</td>
+                <td>35s</td>
+                <td>465b</td>
+                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
+                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
+              </tr>
+              <tr>
+                <th scope="row">Fancy Pattern 3</th>
+                <td>12</td>
+                <td>35s</td>
+                <td>465b</td>
+                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
+                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <a class="btn btn-primary" href="/patterns/create" role="button">Create New &raquo;</a>
+      </div>
+  </main>

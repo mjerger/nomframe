@@ -1,0 +1,40 @@
+  <script>
+  </script>
+  <br>
+  <main class="container">
+      <div class="bg-light p-5">
+          <h2>Animations</h2>
+          <br>
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Size</th>
+                <th scope="col"></th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="animations">
+              <tr>
+                <th scope="row">Fancy Animation 1</th>
+                <td>465b</td>
+                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
+                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
+              </tr>
+              <tr>
+                <th scope="row">Fancy Animation 2</th>
+                <td>465b</td>
+                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
+                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
+              </tr>
+              <tr>
+                <th scope="row">Fancy Animation 3</th>
+                <td>465b</td>
+                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
+                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <a class="btn btn-primary" href="/animations/create" role="button">Create New &raquo;</a>
+      </div>
+  </main>

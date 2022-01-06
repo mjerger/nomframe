@@ -1,0 +1,91 @@
+    <script>
+      var updateSysInfo = function() {
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                var json = JSON.parse(this.responseText);
+                for (var key in json) {
+                  if (json.hasOwnProperty(key)) {
+                    $("#" + key).text(json[key]);
+                  }
+                }
+
+                for (c=0; c<json.leds.length; c+=6) {
+                  var color = "#" + json.leds.substr(c,6);
+                  $("#"+(c/6)).css("background-color", color);
+                }
+            }
+        };
+        xmlhttp.open("GET", "/r/sysinfo", true);
+        xmlhttp.send();
+      }
+      $(document).ready( function() {
+        updateSysInfo();
+        setTimeout(updateSysInfo, 5000);
+      });
+    </script>
+    <main class="container">
+      <div class="bg-light p-5">
+          <h2>Status</h2>
+          <br>
+          <div class="row">
+            <div class="col-lg-8">
+            <table class="table">
+                <tr><th scope="row">Uptime</th><td id="uptime"></td></tr>
+                <tr><th scope="row">Datetime</th><td id="datetime"></td></tr>
+                <tr><th scope="row">IP</th><td id="ip"></td></tr>
+                <tr><th scope="row">Connected to</th><td id="ssid"></td></tr>
+                <tr><th scope="row">mDNS</th><td id="host"></td></tr>
+                <tr>
+                  <th scope="row">Filesystem</th>
+                  <td>
+                    <span id="fs_free"></span> free, 
+                    <span id="fs_used"></span> used, 
+                    <span id="fs_total"></span> total
+                  </td>
+                </tr>
+            </table>
+          </div>
+      </div>
+    </main>
+    <hr>
+    <style>
+      table#preview tr {
+        height: 40px;
+        margin: 0;
+        padding: 0;
+      }
+      
+      table#preview tr td {
+        width: 40px;
+        height: 40px;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+    <script>
+      $(document).ready( function() {
+        var i = 0;
+        for (y=0;y<16;y++) {
+          var row = "<tr>";
+          for (x=0;x<16;x++) {
+            row += '<td id="'+i+'"></td>';
+            i++;
+          }
+          row += "</tr>";
+          $("#preview").append(row);
+        }
+      });
+    </script>
+    <main class="container">
+        <div class="bg-light p-5">
+            <h2>Preview</h2>
+            <br>
+            <p>Currently playing: <span id="cur_playing"></span></p>
+            <table id="preview">
+              
+            </table>
+        </div>
+    </main>
+
+    

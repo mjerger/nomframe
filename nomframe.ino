@@ -51,16 +51,10 @@ struct CRGB {
   }
 };
 
-#define NUM_LEDS 120
+#define NUM_LEDS 256
 CRGB leds[NUM_LEDS];
 
 #define REQ_PIN 5 //D1
-#define CLK_PIN 4 //D2
-#define DAT_PIN 0 //D3
-
-#define LED_DELAY_PRE  100
-#define LED_DELAY_POST 150
-
 
 // Loop and blink forever
 void errorLoop() {
@@ -284,31 +278,19 @@ bool sendError()
 uint8_t flip = 0;
 void handleLEDs()
 {
-  if (digitalRead(REQ_PIN) == LOW) {
-    static uint8_t clk = 0;
-    static uint8_t color = 0;
-
-    digitalWrite(CLK_PIN, clk);
-    for (uint32_t b=0; b<NUM_LEDS*3; b++) {
-      
-      color = ((uint8_t*)&leds)[b];
-      for (uint8_t i=0; i<8; i++) {
-        digitalWrite(DAT_PIN, (color >> i) & 1);
-        clk = 1-clk;
-        
-        for (uint32_t i=0; i<LED_DELAY_PRE; i++) __asm__("nop\n\t");
-        
-        digitalWrite(CLK_PIN, clk);
-        
-        for (uint32_t i=0; i<LED_DELAY_POST; i++) __asm__("nop\n\t");
-      }
-    }
-
-    leds[3] = CRGB(flip);
-    leds[4] = CRGB(flip < 128 ? 255 : 0);
-    if (flip < 255) flip++;
-    else flip=0;
+  if (digitalRead(REQ_PIN) == HIGH) {
+    return;
   }
+
+  if (flip < 255) flip++;
+  else flip=0;
+  leds[3] = CRGB(flip);
+
+  for (uint32_t b=0; b<NUM_LEDS*3; b++) {
+    Serial1.write(((uint8_t*)&leds)[b]);
+    //Serial1.write("A");
+  } 
+  delay(10);
 }
 
 void setup(void)
@@ -317,10 +299,10 @@ void setup(void)
   digitalWrite(LED_BUILTIN, LOW);
   
   pinMode(REQ_PIN, INPUT_PULLUP);
-  pinMode(CLK_PIN, OUTPUT);
-  pinMode(DAT_PIN, OUTPUT);
 
   Serial.begin(115200);
+  Serial1.begin(1000000);
+  
   delay(500);
   Serial.println("\n\n--------------");
   Serial.println(" nomframe 1.0");

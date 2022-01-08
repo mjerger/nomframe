@@ -14,6 +14,7 @@
 #include <uptime.h>
 #include <uptime_formatter.h>
 #include <time.h>
+#include <Lua.h>
 
 // WIFI HTTP server
 
@@ -33,13 +34,13 @@ const String weekdays[7] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday
 
 // LED strip interface
 
-struct CRGB {
+struct RGB {
   uint8_t r;
   uint8_t g;
   uint8_t b;
-  CRGB() : r(0), g(0), b(0){}
-  CRGB(uint8_t all) : r(all), g(all), b(all) {}
-  CRGB(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
+  RGB() : r(0), g(0), b(0){}
+  RGB(uint8_t all) : r(all), g(all), b(all) {}
+  RGB(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
   String toHex() {
     String cr = String(r, HEX);
     String cg = String(g, HEX);
@@ -51,36 +52,65 @@ struct CRGB {
   }
 };
 
-#define NUM_LEDS 256
-CRGB leds[NUM_LEDS];
+#define FPS 60
+uint32_t t;
 
-#define REQ_PIN 5 //D1
+#define WIDTH 16
+#define HEIGHT 16
+#define NUM_LEDS (WIDTH * HEIGHT)
+RGB leds[NUM_LEDS];
+#define REQ_PIN 5 //D1 - request LED data
 
-// Loop and blink forever
-void errorLoop() {
-  while (true) {
-    for (int i=0; i<3; i++) {
-      digitalWrite(LED_BUILTIN, LOW);
-      delay(100);
-      digitalWrite(LED_BUILTIN, HIGH);
-      delay(100);
-    }
-    delay(1000);
+bool playRandom = true;
+uint16_t playDuration = 100;
+uint16_t playTime = 0;
+
+struct Pattern {
+  uint8_t numFrames;
+  uint8_t* data;
+  uint8_t currentFrame;
+  uint8_t fps;
+};
+
+String playingAnimation;
+Pattern playingPattern;
+uint8_t playingPatternFrame;
+
+Lua lua;
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool playAnimation(String animation)
+{
+  String path = (animation.startsWith("/a/") ? animation : "/a/" + animation) + ".lua";
+
+  if (SPIFFS.exists(path) == false) {
+    return false;
+  }
+
+  File file = SPIFFS.open(path, "r");
+  playingAnimation = "";
+  while (file.available()) {
+    playingAnimation += file.readStringUntil('\n');
   }
 }
 
 
-// The content types we serve
-String getContentType(String filename)
+bool animate(uint32_t dt)
 {
-  if (filename.endsWith(".html") || filename.endsWith(".htm")) return "text/html";
-  else if (filename.endsWith(".css")) return "text/css";
-  else if (filename.endsWith(".js"))  return "application/javascript";
-  else if (filename.endsWith(".ico")) return "image/x-icon";
-  else if (filename.endsWith(".png")) return "image/png";
-  return "text/plain";
+  if (playingAnimation.length() > 0)
+  {
+    String script = "leds = {";
+    for (uint16_t l=0; l<NUM_LEDS;l++) {
+      if (l != 0) script += ",";
+      script += "{" + String(leds[l].r) + "," + String(leds[l].g) + "," + String(leds[l].b) + "}";
+    }
+    script += "}\r\ndt = " + String(dt) + "\r\n" + playingAnimation;
+    String ret = lua.execute(&script);
+    Serial.println(ret);
+  }
+  return false;
 }
-
 
 // Send file from FS back
 bool handleFile(String path)
@@ -112,7 +142,7 @@ bool handleREST()
   String path = server.uri().substring(3);
   HTTPMethod method = server.method();
 
-  DynamicJsonDocument json(10000);
+  DynamicJsonDocument json(2000);
 
 // FILES - list all files
   if (path == "files") 
@@ -159,8 +189,7 @@ bool handleREST()
         if (action == "play")
         {
           if (json.containsKey("animation")) {
-            String animation = json["animation"];
-            // TODO play animation
+            playAnimation(json["animation"]);
             return sendOK();
           } else if (json.containsKey("pattern")) {
             String pattern = json["pattern"];
@@ -205,36 +234,17 @@ bool handleREST()
     json["fs_free"]  = String(double(fs_info.totalBytes - fs_info.usedBytes) / 1024.0, 1) + "k";
     json["fs_used"]  = String((double)fs_info.usedBytes / 1024.0, 1) + "k";
     json["fs_total"] = String((double)fs_info.totalBytes / 1024.0, 1) + "k";
-    //json["fs_blockSize"]     = fs_info.blockSize;
-    //json["fs_pageSize"]      = fs_info.pageSize;
-    //json["fs_maxOpenFiles"]  = fs_info.maxOpenFiles;
-    //json["fs_maxPathLength"] = fs_info.maxPathLength;
 
-    // LEDs
-    String colors;
-    for (int l=0; l<NUM_LEDS; l++) {
-      colors = colors + leds[l].toHex();
-    }
-    json["leds"] = colors;
-    
     return sendJson(json);
   }
 
   return false;
 }
 
-String leadingZero(int num)
-{
-  if (num < 10) return "0" + String(num);
-  return String(num);
-}
 
-bool sendJson(DynamicJsonDocument json)
+void handleGetLEDs()
 {
-  String string;
-  serializeJson(json, string);
-  server.send(200, "application/json", string);
-  return true;
+  server.send(200, "application/octet-stream", (const char*)&leds, NUM_LEDS*3);
 }
 
 
@@ -255,28 +265,8 @@ bool handleSaveAnimation()
 }
 
 
-bool sendOK()
-{
-  server.send(200);
-  return true;
-}
-
-
-bool sendRedirect(String location)
-{
-  server.sendHeader("Location", location);
-  server.send(303);
-  return true;
-}
-
-bool sendError()
-{
-  server.send(500, "text/plain", "500: Internal Server Error");
-  return true;
-}
-
 uint8_t flip = 0;
-void handleLEDs()
+void sendLEDs()
 {
   if (digitalRead(REQ_PIN) == HIGH) {
     return;
@@ -284,13 +274,13 @@ void handleLEDs()
 
   if (flip < 255) flip++;
   else flip=0;
-  leds[3] = CRGB(flip);
+  leds[3] = RGB(flip);
 
   for (uint32_t b=0; b<NUM_LEDS*3; b++) {
     Serial1.write(((uint8_t*)&leds)[b]);
-    //Serial1.write("A");
-  } 
-  delay(10);
+  }
+  
+  delay(1);
 }
 
 void setup(void)
@@ -338,6 +328,7 @@ void setup(void)
 
   // Handle requests
   server.on("/",                HTTP_GET,  []() { handleFile ("/home.html"); } );
+  server.on("/leds",            HTTP_GET,  handleGetLEDs);
   server.on("/animations",      HTTP_GET,  []() { handleFile ("/animations.html"); } );
   server.on("/animations/edit", HTTP_GET,  []() { handleFile ("/animations-edit.html"); } );
   server.on("/animations/edit", HTTP_POST, []() { handleSaveAnimation(); });
@@ -361,11 +352,15 @@ void setup(void)
 
 
   for (int i=0; i<NUM_LEDS; i++) {
-    leds[i] = CRGB(0xAA,0xAA,0xAA);
+    leds[i] = RGB(0xAA,0xAA,0xAA);
   }
-  leds[0] = CRGB(255,0,0);
-  leds[1] = CRGB(0,255,0);
-  leds[2] = CRGB(0,0,255);
+  leds[0] = RGB(255,0,0);
+  leds[1] = RGB(0,255,0);
+  leds[2] = RGB(0,0,255);
+
+  t = millis();
+
+  playAnimation("example");
 }
 
 
@@ -374,6 +369,12 @@ void loop(void)
   server.handleClient();
   MDNS.update();
 
+  uint32_t dt = millis() - t;
+
+  //animate(dt);
+  
   // TODO prepare next frame here
-  handleLEDs();
+  sendLEDs();
+
+  t = millis();
 }

@@ -44,16 +44,29 @@
         xmlhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
         xmlhttp.send(JSON.stringify(json));
       }
-      var getJson = function(url, handleResponse) {
-        get(url, function(response) {
+      var getJson = function(url, handleResponse, handleError) {
+        getText(url, function(response) {
           handleResponse(JSON.parse(response));
-        })
+        }, handleError);
       }
-      var get = function(url, handleResponse) {
+      var getData = function(url, handleResponse, handleError) {
         var xmlhttp = new XMLHttpRequest();
         xmlhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-              handleResponse(this.responseText);
+            if (this.readyState == 4) {
+              if (this.status == 200) handleResponse(this.response);
+              else if (handleError) handleError(this);
+            }
+        };
+        xmlhttp.open("GET", url, true);
+        xmlhttp.responseType = "arraybuffer";
+        xmlhttp.send();
+      }
+      var getText = function(url, handleResponse, handleError) {
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.onreadystatechange = function() {
+            if (this.readyState == 4) {
+              if (this.status == 200) handleResponse(this.responseText);
+              else if (handleError) handleError(this);
             }
         };
         xmlhttp.open("GET", url, true);

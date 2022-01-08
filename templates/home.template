@@ -6,15 +6,26 @@
               $("#" + key).text(json[key]);
             }
           }
-          for (c=0; c<json.leds.length; c+=6) {
-            var color = "#" + json.leds.substr(c,6);
-            $("#"+(c/6)).css("background-color", color);
-          }
+        });
+      }
+      var byteToHex = function(byte) {
+        return ('0' + (byte & 0xFF).toString(16)).slice(-2)
+      }
+      var updatePattern = function() {
+        getData("/leds", function(data) {
+          var bytes = new Uint8Array(data);
+          for (var i = 0; i < bytes.byteLength; i+=3) {
+            var r = byteToHex(bytes[i]);
+            var g = byteToHex(bytes[i+1]);
+            var b = byteToHex(bytes[i+2]);
+            $("#" + i/3).css("background-color", "#"+r+g+b);
+          };
         });
       }
       $(document).ready( function() {
         updateSysInfo();
         setInterval(updateSysInfo, 5000);
+        setInterval(updatePattern, 1000);
         $("#reboot").click(function() { sendJson("/r/action", { "action" : "reboot" }); });
       });
     </script>

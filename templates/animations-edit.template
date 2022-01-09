@@ -47,13 +47,12 @@
     });
   </script>
   <div id="overlay" style="opacity: .85; height: 100%; width: 100%; background-color: #fff;position: absolute; text-align: center">LOADING ...</div>
-  <br>
   <main class="container">
       <div class="bg-light p-5">
           <h2><span id="title"></span></h2>
           <br>
           <form name="form" method="POST" action="" enctype="multipart/form-data">
-            <textarea id="animation" name="animation" rows="30" style="width:100%" required="true" pattern=".{1,10000}" oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('Maximum length is 10,000 characters.')"></textarea>
+            <textarea id="animation" name="animation" rows="20" style="width:100%" required="true" pattern=".{1,10000}" oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('Maximum length is 10,000 characters.')"></textarea>
             <input class="mb-1" id="name" name="name" placeholder="Animation Name" required="true" pattern="[a-zA-Z0-9. -]{0,20}" oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('Maximum 20 characters of [a-zA-Z0-9.-] and space')"><br>
             <input type="submit" class="btn btn-primary" role="button" id="save" value="Save">
             <input type="button" class="btn btn-primary mx-2" role="button" id="cancel" value="Cancel">

@@ -7,6 +7,7 @@
             }
           }
         });
+        $("#overlay").hide();
       }
       var byteToHex = function(byte) {
         return ('0' + (byte & 0xFF).toString(16)).slice(-2)
@@ -69,6 +70,7 @@
         }
       });
     </script>
+    <div id="overlay" style="opacity: .85; height: 100%; width: 100%; background-color: #fff;position: absolute; text-align: center">LOADING ...</div>
     <main class="container">
         <div class="bg-light p-5">
             <h2>Preview</h2>

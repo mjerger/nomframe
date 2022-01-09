@@ -1,9 +1,51 @@
   <script>
+    var play = function(animationName) {
+      var json = { "action" : "play", "animation" : animationName };
+      postJson("/r/action", json);
+    }
+    var updateList = function() {
+      getJson("/r/patterns", function(json) { 
+        $("#list").empty();
+        for (var key in json) {
+          var name = key.replace(/\.[^/.]+$/, "");
+          var size = json[key];
+          $("#list").append('\
+          <tr> \
+            <th scope="row">' + name.replace("_", " ") + '</th> \
+            <td>' + size + '</td> \
+            <td class="text-end"> \
+              <a class="btn btn-primary mx-1" href="patterns/edit?a=' + name + '" role="button">Edit</button> \
+              <a class="btn btn-primary mx-1 play " data-name="' + name + '" href="#" role="button">Play</button> \
+            </td> \
+          </tr>');
+        }
+        $(".play").click(function() {
+          play($(this).data("name"));
+        });
+        $("#overlay").hide();
+      });
+    }
+    $(document).ready( function() {
+      updateList();
+    });
   </script>
-  <br>
+  <div id="overlay" style="opacity: .85; height: 100%; width: 100%; background-color: #fff;position: absolute; text-align: center">LOADING ...</div>
   <main class="container">
       <div class="bg-light p-5">
-          <h2>Edit Pattern <span id="ani_name"></span></h2>
+          <h2>Patterns</h2>
           <br>
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Size</th>
+                <th scope="col">Frames</th>
+                <th scope="col">Length</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="list"></tbody>
+          </table>
+          <a class="btn btn-primary" href="/patterns/edit" role="button">Create New &raquo;</a>
       </div>
   </main>

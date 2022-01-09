@@ -61,22 +61,24 @@ uint32_t t;
 RGB leds[NUM_LEDS];
 #define REQ_PIN 5 //D1 - request LED data
 
-bool playRandom = true;
-uint16_t playDuration = 100;
 uint16_t playTime = 0;
 
-struct Pattern {
-  uint8_t numFrames;
+enum PlayingType {
+  Animation,
+  Pattern
+}
+
+struct Playing {
+  PlayingType type;
+  String filename;
   uint8_t* data;
+  Lua lua;
+  uint8_t numFrames;
   uint8_t currentFrame;
   uint8_t fps;
+  uint8_t duration;
 };
 
-String playingAnimation;
-Pattern playingPattern;
-uint8_t playingPatternFrame;
-
-Lua lua;
 
 ////////////////////////////////////////////////////////////////////////////////
 

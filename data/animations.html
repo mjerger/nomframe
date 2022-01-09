@@ -17,23 +17,26 @@
   <body>
     <nav class="navbar navbar-expand-md navbar-dark bg-dark">
       <div class="container-fluid">
-          <b><a class="navbar-brand mx-4" href="#">nomframe</a></b>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-          </button>
-          <div class="collapse navbar-collapse" id="navbarCollapse">
+        <b><a class="navbar-brand mx-4" href="/">nomframe</a></b>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarCollapse">
           <ul class="navbar-nav me-auto mb-2 mb-md-0">
-              <li class="nav-item mx-4">
-                <a class="nav-link active" href="/">Home</a>
-              </li>
-              <li class="nav-item mx-4">
-                <a class="nav-link active" href="/animations">Animations</a>
-              </li>
-              <li class="nav-item mx-4">
-                <a class="nav-link active" href="/patterns">Patterns</a>
-              </li>
+            <li class="nav-item mx-4">
+              <a class="nav-link active" href="/">Home</a>
+            </li>
+            <li class="nav-item mx-4">
+              <a class="nav-link active" href="/animations">Animations</a>
+            </li>
+            <li class="nav-item mx-4">
+              <a class="nav-link active" href="/patterns">Patterns</a>
+            </li>
+            <li class="nav-item mx-4">
+              <a class="nav-link active" href="/settings">Settings</a>
+            </li>
           </ul>
-          </div>
+        </div>
       </div>
     </nav>
     <br>
@@ -44,11 +47,13 @@
         xmlhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
         xmlhttp.send(JSON.stringify(json));
       }
+
       var getJson = function(url, handleResponse, handleError) {
         getText(url, function(response) {
           handleResponse(JSON.parse(response));
         }, handleError);
       }
+
       var getData = function(url, handleResponse, handleError) {
         var xmlhttp = new XMLHttpRequest();
         xmlhttp.onreadystatechange = function() {
@@ -61,6 +66,7 @@
         xmlhttp.responseType = "arraybuffer";
         xmlhttp.send();
       }
+
       var getText = function(url, handleResponse, handleError) {
         var xmlhttp = new XMLHttpRequest();
         xmlhttp.onreadystatechange = function() {
@@ -72,35 +78,83 @@
         xmlhttp.open("GET", url, true);
         xmlhttp.send();
       }
+
+      var playAnimation = function(animation) {
+        var json = { "action" : "play", "animation" : animation };
+        postJson("/r/action", json);
+      }
+
+      var playPattern = function(pattern) {
+        var json = { "action" : "play", "pattern" : pattern };
+        postJson("/r/action", json);
+      }
+
+      var width=0; var height=0;
+      var initLEDTable = function(width, height) {
+        $("#leds").empty();
+        var i = 0;
+        for (y=0; y<height; y++) {
+          var row = "<tr>";
+          for (x=0; x<width; x++) {
+            row += '<td id="'+i+'"></td>';
+            i++;
+          }
+          row += "</tr>";
+          $("#leds").append(row);
+        }
+      }
+      var initLEDs = function() {
+        getJson("/r/leds", function(json) {
+          width = json.width;
+          height = json.height;
+          initLEDTable(widht, height);
+        });
+      }
+
+      var setPattern = function(bytes) {
+        for (var i=0; i<bytes.byteLength; i+=3) {
+            var r = byteToHex(bytes[i]);
+            var g = byteToHex(bytes[i+1]);
+            var b = byteToHex(bytes[i+2]);
+            $("#" + i/3).css("background-color", "#"+r+g+b);
+          };
+      }
+
+      var byteToHex = function(byte) {
+        return ('0' + (byte & 0xFF).toString(16)).slice(-2)
+      }
+
+      const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
+      var getColor = function(col) {
+        if (col.startsWith("#")) return col;
+        return rgb2hex(col);
+      }
+
     </script>
     <style>
       a { color: rgb(33, 37, 41) };
-      table#preview tr {
+      table#leds tr {
         height: 40px;
         margin: 0;
         padding: 0;
       }
-      table#preview tr td {
+      table#leds tr td {
         width: 40px;
         height: 40px;
         margin: 0;
         padding: 0;
       }
     </style>  <script>
-    var play = function(animationName) {
-      var json = { "action" : "play", "animation" : animationName };
-      postJson("/r/action", json);
-    }
     var updateList = function() {
       getJson("/r/animations", function(json) { 
-        $("#animations").empty();
+        $("#list").empty();
         for (var key in json) {
-          var name = key.replace(/\.[^/.]+$/, "");
+          var name = key;
           var size = json[key];
-          $("#animations").append('\
+          $("#list").append('\
           <tr> \
             <th scope="row">' + name.replace("_", " ") + '</th> \
-            <td>' + size + '</td> \
+            <td>' + size + 'b</td> \
             <td class="text-end"> \
               <a class="btn btn-primary mx-1" href="animations/edit?a=' + name + '" role="button">Edit</button> \
               <a class="btn btn-primary mx-1 play " data-name="' + name + '" href="#" role="button">Play</button> \
@@ -108,31 +162,32 @@
           </tr>');
         }
         $(".play").click(function() {
-          play($(this).data("name"));
+          playAnimation($(this).data("name"));
         });
+        $("#overlay").hide();
       });
     }
     $(document).ready( function() {
       updateList();
     });
   </script>
-  <br>
+  <div id="overlay" style="opacity: .85; height: 100%; width: 100%; background-color: #fff;position: absolute; text-align: center">LOADING ...</div>
   <main class="container">
-      <div class="bg-light p-5">
-          <h2>Animations</h2>
-          <br>
-          <table class="table">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Size</th>
-                <th scope="col"></th>
-              </tr>
-            </thead>
-            <tbody id="animations"></tbody>
-          </table>
-          <a class="btn btn-primary" href="/animations/edit" role="button">Create New &raquo;</a>
-      </div>
+    <div class="bg-light p-5">
+      <h2>Animations</h2>
+      <br>
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Size</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody id="list"></tbody>
+      </table>
+      <a class="btn btn-primary" href="/animations/edit" role="button">Create New &raquo;</a>
+    </div>
   </main>
   </body>
 </html>

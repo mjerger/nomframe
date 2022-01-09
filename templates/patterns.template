@@ -1,48 +1,54 @@
   <script>
+    var updateList = function() {
+      getJson("/r/patterns", function(json) { 
+        $("#list").empty();
+        for (var key in json) {
+          var name = key;
+          if (json[key]) {
+            var size = json[key].size
+            var frames = json[key].f;
+            var delay = json[key].d;
+            var length = frames * delay;
+            $("#list").append('\
+            <tr> \
+              <th scope="row">' + name.replace("_", " ") + '</th> \
+              <td>' + size + 'b</td> \
+              <td>' + frames + '</td> \
+              <td>' + length + 'ms</td> \
+              <td class="text-end"> \
+                <a class="btn btn-primary mx-1" href="patterns/edit?p=' + name + '" role="button">Edit</button> \
+                <a class="btn btn-primary mx-1 play " data-name="' + name + '" href="#" role="button">Play</button> \
+              </td> \
+            </tr>');
+          }
+        }
+        $(".play").click(function() {
+          play($(this).data("name"));
+        });
+        $("#overlay").hide();
+      });
+    }
+    $(document).ready( function() {
+      updateList();
+    });
   </script>
-  <br>
+  <div id="overlay" style="opacity: .85; height: 100%; width: 100%; background-color: #fff;position: absolute; text-align: center">LOADING ...</div>
   <main class="container">
-      <div class="bg-light p-5">
-          <h2>Patterns</h2>
-          <br>
-          <table class="table">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Frames</th>
-                <th scope="col">Length</th>
-                <th scope="col">Size</th>
-                <th scope="col"></th>
-                <th scope="col"></th>
-              </tr>
-            </thead>
-            <tbody id="patterns">
-              <tr>
-                <th scope="row">Fancy Pattern 1</th>
-                <td>12</td>
-                <td>35s</td>
-                <td>465b</td>
-                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
-                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
-              </tr>
-              <tr>
-                <th scope="row">Fancy Pattern 2</th>
-                <td>12</td>
-                <td>35s</td>
-                <td>465b</td>
-                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
-                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
-              </tr>
-              <tr>
-                <th scope="row">Fancy Pattern 3</th>
-                <td>12</td>
-                <td>35s</td>
-                <td>465b</td>
-                <td><a class="btn btn-primary" href="#" role="button">Play</button></td>
-                <td><a class="btn btn-primary" href="#" role="button">Edit</button></td>
-              </tr>
-            </tbody>
-          </table>
-          <a class="btn btn-primary" href="/patterns/create" role="button">Create New &raquo;</a>
-      </div>
+    <div class="bg-light p-5">
+      <h2>Patterns</h2>
+      <br>
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Size</th>
+            <th scope="col">Frames</th>
+            <th scope="col">Length</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody id="list"></tbody>
+      </table>
+      <a class="btn btn-primary" href="/patterns/edit" role="button">Create New &raquo;</a>
+    </div>
   </main>

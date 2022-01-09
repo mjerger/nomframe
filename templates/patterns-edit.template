@@ -1,51 +1,139 @@
-  <script>
-    var play = function(animationName) {
-      var json = { "action" : "play", "animation" : animationName };
-      postJson("/r/action", json);
-    }
-    var updateList = function() {
-      getJson("/r/patterns", function(json) { 
-        $("#list").empty();
-        for (var key in json) {
-          var name = key.replace(/\.[^/.]+$/, "");
-          var size = json[key];
-          $("#list").append('\
-          <tr> \
-            <th scope="row">' + name.replace("_", " ") + '</th> \
-            <td>' + size + '</td> \
-            <td class="text-end"> \
-              <a class="btn btn-primary mx-1" href="patterns/edit?a=' + name + '" role="button">Edit</button> \
-              <a class="btn btn-primary mx-1 play " data-name="' + name + '" href="#" role="button">Play</button> \
-            </td> \
-          </tr>');
+<script>
+    var mode = "create";
+    var currentName = "";
+    var frameData = [];
+
+    var setFrame = function(index, bytes) {
+      var ctx = $("#f"+index)[0].getContext('2d');
+      var size = 4;
+      ctx.canvas.width = width * size;
+      ctx.canvas.height = height * size;
+      var b = 0;
+      for (y=0; y<height; y++) {
+        for (x=0; x<width; x++) {
+          var r = bytes[b];
+          var g = bytes[b+1];
+          var b = bytes[b+2];
+          ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
+          ctx.fillRect(x*size, y*size, (x+1)*size, (y+1)*size);
+          b+=3;
         }
-        $(".play").click(function() {
-          play($(this).data("name"));
+      }
+    }
+    var loadPattern = function(name) {
+      getJson("/p/" + name + ".json", function(json) {
+        var frames = json.f;
+        width = json.w; height = json.h;
+        initLEDTable(width, height);
+        setupClicks();
+        getData("/p/" + name + ".pat", function(data) {
+          var bytes = new Uint8Array(data);
+          var numbytes = width * height * 3;
+          
+          $("#frames").empty();
+          for (var f=0; f<frames; f++) {
+            var frame = bytes.slice(f*numbytes, (f+1)*numbytes);
+            frameData.push(frame);
+            $("#frames").append('<canvas id="f'+f+'"/>');
+            setFrame(f, frame);
+            $("#f"+f).click(function() {
+              var id = $(this).attr("id").substr(1);
+              setPattern(frameData[parseInt(id)]);
+            });
+          }
+
+          setPattern(frameData[0]);
+
+          $("#overlay").hide();
         });
-        $("#overlay").hide();
+        });
+    }
+
+    var startEdit = function(name) {
+      mode = "edit"
+      currentName = name;
+      loadPattern(name);
+      name = name.replace("_", " ");
+      $("#title").text('Edit Pattern "' + name + '"');
+      $("#name").val(name);
+      $("#name").hide();
+      $("#overlay").show();
+    }
+
+    var startCreate = function() {
+      initLEDs();
+      mode = "create";
+      $("#title").text("Create new Pattern");
+      $("#name").show();
+      $("#overlay").hide();
+    }
+
+    var setupClicks = function() {
+      $("#leds tr td").mousedown(function(event) {
+        if (event.shiftKey) {
+          if (event.which == 1) { // left click
+            $("#left").val(getColor($(this).css("background-color")));
+          } else if (event.which == 3) { // right click
+            $("#right").val(getColor($(this).css("background-color")));
+          }
+        } else {
+          if (event.which == 1) { // left click
+            $(this).css("background-color", $("#left").val());
+          } else if (event.which == 3) { // right click
+            $(this).css("background-color", $("#right").val());
+          }
+        }
       });
     }
     $(document).ready( function() {
-      updateList();
+      var url = new URL(window.location.href);
+      if (url.searchParams.has("p")) {
+        var name = url.searchParams.get("p");
+        startEdit(name);
+      }
+      else
+      {
+        startCreate();
+      }
+
+      $("#cancel").click(function() {
+        if (mode == "edit") {
+          startEdit(currentName);
+        } else {
+          window.location = "/patterns";
+        }
+        event.preventDefault();
+      });
+
+      $("#save").click(function() {
+        $("#form").submit();
+      });
+      
+      $('#leds').contextmenu(function() {
+          return false;
+      });
+
     });
   </script>
   <div id="overlay" style="opacity: .85; height: 100%; width: 100%; background-color: #fff;position: absolute; text-align: center">LOADING ...</div>
   <main class="container">
-      <div class="bg-light p-5">
-          <h2>Patterns</h2>
-          <br>
-          <table class="table">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Size</th>
-                <th scope="col">Frames</th>
-                <th scope="col">Length</th>
-                <th scope="col"></th>
-              </tr>
-            </thead>
-            <tbody id="list"></tbody>
-          </table>
-          <a class="btn btn-primary" href="/patterns/edit" role="button">Create New &raquo;</a>
-      </div>
+    <div class="bg-light p-5">
+      <h2><span id="title"></span></h2>
+      <br>
+      <table id="leds"></table>
+      <br>
+      <div id="frames"></div>
+      <input type="color" id="left" name="left" value="#ffffff">
+      <label for="left">Left</label>
+      <input type="color" id="right" name="right" value="#000000">
+      <label for="right">Right</label>
+      <br>
+      Duration <input id="duration" value="250"> ms
+      <form name="form" method="POST" action="" enctype="multipart/form-data">
+        <input type="hidden" id="pattern" name="pattern"/>
+        <input class="mb-1" id="name" name="name" placeholder="Animation Name" required="true" pattern="[a-zA-Z0-9. -]{0,20}" oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('Maximum 20 characters of [a-zA-Z0-9.-] and space')"><br>
+        <input type="submit" class="btn btn-primary" role="button" id="save" value="Save">
+        <input type="button" class="btn btn-primary mx-2" role="button" id="cancel" value="Cancel">
+      </form>
+    </div>
   </main>

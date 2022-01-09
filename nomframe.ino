@@ -23,6 +23,7 @@ const char *password = "Handschuhfachbeleuchtungsschalter";
 const char *mdnsHostname = "nomframe";
 const String methods[8] { "ANY", "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" };
 ESP8266WebServer server(80);
+File uploadFile; 
 
 // NTP
 
@@ -66,7 +67,7 @@ uint16_t playTime = 0;
 enum PlayingType {
   Animation,
   Pattern
-}
+};
 
 struct Playing {
   PlayingType type;
@@ -79,11 +80,14 @@ struct Playing {
   uint8_t duration;
 };
 
+Playing playing;
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
 bool playAnimation(String animation)
 {
+  /*
   String path = (animation.startsWith("/a/") ? animation : "/a/" + animation) + ".lua";
 
   if (SPIFFS.exists(path) == false) {
@@ -95,11 +99,13 @@ bool playAnimation(String animation)
   while (file.available()) {
     playingAnimation += file.readStringUntil('\n');
   }
+  */
 }
 
 
 bool animate(uint32_t dt)
 {
+  /*
   if (playingAnimation.length() > 0)
   {
     String script = "leds = {";
@@ -111,6 +117,7 @@ bool animate(uint32_t dt)
     String ret = lua.execute(&script);
     Serial.println(ret);
   }
+  */
   return false;
 }
 
@@ -163,7 +170,11 @@ bool handleREST()
     if (method == HTTP_GET) {
       Dir dir = SPIFFS.openDir("/a/");
       while (dir.next()) {
-        json[dir.fileName().substring(3)] = dir.fileSize();
+        String filename = dir.fileName().substring(3);
+        if (filename.endsWith(".lua")) {
+          filename = filename.substring(0, filename.length()-4);
+          json[filename] = dir.fileSize();
+        }
       }
       return sendJson(json);
     }
@@ -174,7 +185,28 @@ bool handleREST()
     if (method == HTTP_GET) {
       Dir dir = SPIFFS.openDir("/p/");
       while (dir.next()) {
-        json[dir.fileName()] = dir.fileSize();
+        String filename = dir.fileName().substring(3);
+        if (filename.endsWith(".json"))
+        {
+          filename = filename.substring(0, filename.length()-5);
+
+          // Get pattern config
+          StaticJsonDocument<100> patInfo;
+          File file = SPIFFS.open(dir.fileName(), "r");
+          deserializeJson(patInfo, file);
+          file.close();
+
+          // Get pattern size
+          String patFilename = "/p/" + filename + ".pat";
+          if (SPIFFS.exists(patFilename))
+          {
+            file = SPIFFS.open(patFilename, "r");
+            patInfo["size"] = file.size();
+            file.close();
+          }
+
+          json[filename] = patInfo;
+        }
       }
       return sendJson(json);
     }
@@ -221,7 +253,7 @@ bool handleREST()
                        leadingZero(tm.tm_mday)   + "." + 
                        leadingZero(tm.tm_mon+1)  + "." + 
                        String(tm.tm_year + 1900) + " " + 
-                       leadingZero(tm.tm_hour)   + ":" + 
+                       leadingZero(tm.tm_hour+1)   + ":" +  // No idea why it's off by one.. maybe DST is not working??
                        leadingZero(tm.tm_min)    + ":" + 
                        leadingZero(tm.tm_sec);
     
@@ -236,6 +268,14 @@ bool handleREST()
     json["fs_free"]  = String(double(fs_info.totalBytes - fs_info.usedBytes) / 1024.0, 1) + "k";
     json["fs_used"]  = String((double)fs_info.usedBytes / 1024.0, 1) + "k";
     json["fs_total"] = String((double)fs_info.totalBytes / 1024.0, 1) + "k";
+
+    return sendJson(json);
+  }
+  else if (path == String("leds"))
+  {
+    json["leds"] = NUM_LEDS;
+    json["width"] = WIDTH;
+    json["height"] = WIDTH;
 
     return sendJson(json);
   }
@@ -258,11 +298,49 @@ bool handleSaveAnimation()
     
     String filename = "/a/" + name + ".lua";
     File file = SPIFFS.open(filename, "w");
-    file.print(String(server.arg("animation")));
+    String data = server.arg("animation");
+    file.write(data.c_str(), data.length());
     file.close();
 
     return sendRedirect("/animations/edit?a=" + name);
   }
+  return sendError();
+}
+
+bool handleSavePattern()
+{
+  if (server.hasArg("pattern") && server.hasArg("name")) {
+    
+    String name = String(server.arg("name"));
+    name.replace(" ", "_");
+
+    // Handle file upload
+    HTTPUpload& upload = server.upload();
+    if(upload.status == UPLOAD_FILE_START) {
+      uploadFile = SPIFFS.open("/p/" + name + ".pat", "w");
+    
+    } else if(upload.status == UPLOAD_FILE_WRITE) {
+      if(uploadFile)
+        uploadFile.write(upload.buf, upload.currentSize);
+    
+    } else if(upload.status == UPLOAD_FILE_END) {
+      if(uploadFile) {
+        uploadFile.close();
+
+        // Save json file
+        File file = SPIFFS.open("/p/" + name + ".json", "w");
+        String data = server.arg("pattern");
+        file.write(data.c_str(), data.length());
+        file.close();
+        
+        return sendRedirect("/patterns/edit?p=" + name);
+      
+      } else {
+        return sendError();
+      }
+    }
+  }
+  
   return sendError();
 }
 
@@ -333,9 +411,11 @@ void setup(void)
   server.on("/leds",            HTTP_GET,  handleGetLEDs);
   server.on("/animations",      HTTP_GET,  []() { handleFile ("/animations.html"); } );
   server.on("/animations/edit", HTTP_GET,  []() { handleFile ("/animations-edit.html"); } );
-  server.on("/animations/edit", HTTP_POST, []() { handleSaveAnimation(); });
+  server.on("/animations/edit", HTTP_POST, handleSaveAnimation);
   server.on("/patterns",        HTTP_GET,  []() { handleFile ("/patterns.html"); } );
   server.on("/patterns/edit",   HTTP_GET,  []() { handleFile ("/patterns-edit.html"); } );
+  server.on("/patterns/edit",   HTTP_POST, handleSavePattern);
+  server.on("/settings",        HTTP_GET,  []() { handleFile ("/settings.html"); } );
   
   server.onNotFound([]() {
     Serial.print(methods[server.method()]);
@@ -362,7 +442,7 @@ void setup(void)
 
   t = millis();
 
-  playAnimation("example");
+  //playAnimation("example");
 }
 
 

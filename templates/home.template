@@ -9,22 +9,17 @@
         });
         $("#overlay").hide();
       }
-      var byteToHex = function(byte) {
-        return ('0' + (byte & 0xFF).toString(16)).slice(-2)
-      }
+
       var updatePattern = function() {
         getData("/leds", function(data) {
           var bytes = new Uint8Array(data);
-          for (var i = 0; i < bytes.byteLength; i+=3) {
-            var r = byteToHex(bytes[i]);
-            var g = byteToHex(bytes[i+1]);
-            var b = byteToHex(bytes[i+2]);
-            $("#" + i/3).css("background-color", "#"+r+g+b);
-          };
+          setPattern(bytes);
         });
       }
+
       $(document).ready( function() {
         updateSysInfo();
+        initLEDs();
         setInterval(updateSysInfo, 5000);
         setInterval(updatePattern, 1000);
         $("#reboot").click(function() { sendJson("/r/action", { "action" : "reboot" }); });
@@ -56,27 +51,13 @@
       </div>
     </main>
     <hr>
-    <script>
-      $(document).ready( function() {
-        var i = 0;
-        for (y=0;y<16;y++) {
-          var row = "<tr>";
-          for (x=0;x<16;x++) {
-            row += '<td id="'+i+'"></td>';
-            i++;
-          }
-          row += "</tr>";
-          $("#preview").append(row);
-        }
-      });
-    </script>
     <div id="overlay" style="opacity: .85; height: 100%; width: 100%; background-color: #fff;position: absolute; text-align: center">LOADING ...</div>
     <main class="container">
         <div class="bg-light p-5">
             <h2>Preview</h2>
             <br>
             <p>Currently playing: <span id="cur_playing"></span></p>
-            <table id="preview"></table>
+            <table id="leds"></table>
         </div>
     </main>
 

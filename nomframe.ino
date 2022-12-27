@@ -14,12 +14,12 @@
 #include <uptime.h>
 #include <uptime_formatter.h>
 #include <time.h>
-#include <Lua.h>
+#include "tinyexpr.h"
 
 // WIFI HTTP server
 
-const char *ssid = "2rw";
-const char *password = "Handschuhfachbeleuchtungsschalter";
+const char *ssid = "";
+const char *password = "";
 const char *mdnsHostname = "nomframe";
 const String methods[8] { "ANY", "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" };
 ESP8266WebServer server(80);
@@ -54,7 +54,6 @@ struct RGB {
 };
 
 #define FPS 60
-uint32_t t;
 
 #define WIDTH 16
 #define HEIGHT 16
@@ -62,63 +61,84 @@ uint32_t t;
 RGB leds[NUM_LEDS];
 #define REQ_PIN 5 //D1 - request LED data
 
-uint16_t playTime = 0;
-
-enum PlayingType {
-  Animation,
-  Pattern
-};
-
 struct Playing {
-  PlayingType type;
-  String filename;
-  uint8_t* data;
-  Lua lua;
-  uint8_t numFrames;
-  uint8_t currentFrame;
-  uint8_t fps;
-  uint8_t duration;
+  String animation = "";
+  String data = "";
 };
 
 Playing playing;
 
-
 ////////////////////////////////////////////////////////////////////////////////
 
-bool playAnimation(String animation)
+void playAnimation(String animation)
 {
-  /*
-  String path = (animation.startsWith("/a/") ? animation : "/a/" + animation) + ".lua";
+  String path = (animation.startsWith("/a/") ? animation : "/a/" + animation) + ".json";
 
   if (SPIFFS.exists(path) == false) {
-    return false;
+    return;
   }
 
+  // Read animation data
   File file = SPIFFS.open(path, "r");
-  playingAnimation = "";
+  String data = "";
   while (file.available()) {
-    playingAnimation += file.readStringUntil('\n');
+    data += file.readStringUntil('\n');
   }
-  */
+
+  // Parse JSON doc
+  DynamicJsonDocument doc(1024);
+  deserializeJson(doc, data);
+  playing.data = String(doc["f"]);
+  playing.animation = animation;
+
+  Serial.println("playing " + animation);
 }
 
 
-bool animate(uint32_t dt)
+RGB rgbMap(double value)
 {
-  /*
-  if (playingAnimation.length() > 0)
-  {
-    String script = "leds = {";
-    for (uint16_t l=0; l<NUM_LEDS;l++) {
-      if (l != 0) script += ",";
-      script += "{" + String(leds[l].r) + "," + String(leds[l].g) + "," + String(leds[l].b) + "}";
-    }
-    script += "}\r\ndt = " + String(dt) + "\r\n" + playingAnimation;
-    String ret = lua.execute(&script);
-    Serial.println(ret);
+  double v = clamp(value, -1.0, 1.0) * 255;
+  if (v < 0) {
+    return RGB(v,0,0);
+  } else {
+    return RGB(0,0,v);
   }
-  */
-  return false;
+}
+
+uint16_t getLED(int x, int y)
+{
+  return y*16 + x;
+}
+
+
+void animate(uint32_t ms)
+{
+  
+  if (playing.data.length() == 0) return;
+  
+  double x, y, t;
+  t = ms / 1000.0;
+
+  te_variable vars[] = {{"x", &x}, {"y", &y}, {"t", &t}};
+  
+  int err;
+  te_expr *expr = te_compile("sqrt(x^2+y^2)", vars, 2, &err);
+  if (!expr) {
+    Serial.println("Parse error");
+  } else {
+    for (int x_i = 0; x_i < 16; x_i++) {
+      for (int y_i = 0; y_i < 16; y_i++) {
+        x = x_i;
+        y = y_i;
+        double v = te_eval(expr);
+        leds[getLED(x_i, y_i)] = rgbMap(v);
+        
+        Serial.println("v = " + String(v));
+      }
+    }
+
+    te_free(expr);
+  }
 }
 
 // Send file from FS back
@@ -171,41 +191,9 @@ bool handleREST()
       Dir dir = SPIFFS.openDir("/a/");
       while (dir.next()) {
         String filename = dir.fileName().substring(3);
-        if (filename.endsWith(".lua")) {
-          filename = filename.substring(0, filename.length()-4);
-          json[filename] = dir.fileSize();
-        }
-      }
-      return sendJson(json);
-    }
-  }
-// PATTERNS - list all patterns
-  else if (path == "patterns") 
-  {  
-    if (method == HTTP_GET) {
-      Dir dir = SPIFFS.openDir("/p/");
-      while (dir.next()) {
-        String filename = dir.fileName().substring(3);
-        if (filename.endsWith(".json"))
-        {
+        if (filename.endsWith(".json")) {
           filename = filename.substring(0, filename.length()-5);
-
-          // Get pattern config
-          StaticJsonDocument<100> patInfo;
-          File file = SPIFFS.open(dir.fileName(), "r");
-          deserializeJson(patInfo, file);
-          file.close();
-
-          // Get pattern size
-          String patFilename = "/p/" + filename + ".pat";
-          if (SPIFFS.exists(patFilename))
-          {
-            file = SPIFFS.open(patFilename, "r");
-            patInfo["size"] = file.size();
-            file.close();
-          }
-
-          json[filename] = patInfo;
+          json[filename] = dir.fileSize();
         }
       }
       return sendJson(json);
@@ -224,10 +212,6 @@ bool handleREST()
         {
           if (json.containsKey("animation")) {
             playAnimation(json["animation"]);
-            return sendOK();
-          } else if (json.containsKey("pattern")) {
-            String pattern = json["pattern"];
-            // TODO play pattern
             return sendOK();
           }
         }
@@ -296,7 +280,7 @@ bool handleSaveAnimation()
     String name = String(server.arg("name"));
     name.replace(" ", "_");
     
-    String filename = "/a/" + name + ".lua";
+    String filename = "/a/" + name + ".json";
     File file = SPIFFS.open(filename, "w");
     String data = server.arg("animation");
     file.write(data.c_str(), data.length());
@@ -307,54 +291,12 @@ bool handleSaveAnimation()
   return sendError();
 }
 
-bool handleSavePattern()
-{
-  if (server.hasArg("pattern") && server.hasArg("name")) {
-    
-    String name = String(server.arg("name"));
-    name.replace(" ", "_");
 
-    // Handle file upload
-    HTTPUpload& upload = server.upload();
-    if(upload.status == UPLOAD_FILE_START) {
-      uploadFile = SPIFFS.open("/p/" + name + ".pat", "w");
-    
-    } else if(upload.status == UPLOAD_FILE_WRITE) {
-      if(uploadFile)
-        uploadFile.write(upload.buf, upload.currentSize);
-    
-    } else if(upload.status == UPLOAD_FILE_END) {
-      if(uploadFile) {
-        uploadFile.close();
-
-        // Save json file
-        File file = SPIFFS.open("/p/" + name + ".json", "w");
-        String data = server.arg("pattern");
-        file.write(data.c_str(), data.length());
-        file.close();
-        
-        return sendRedirect("/patterns/edit?p=" + name);
-      
-      } else {
-        return sendError();
-      }
-    }
-  }
-  
-  return sendError();
-}
-
-
-uint8_t flip = 0;
 void sendLEDs()
 {
   if (digitalRead(REQ_PIN) == HIGH) {
     return;
   }
-
-  if (flip < 255) flip++;
-  else flip=0;
-  leds[3] = RGB(flip);
 
   for (uint32_t b=0; b<NUM_LEDS*3; b++) {
     Serial1.write(((uint8_t*)&leds)[b]);
@@ -412,9 +354,6 @@ void setup(void)
   server.on("/animations",      HTTP_GET,  []() { handleFile ("/animations.html"); } );
   server.on("/animations/edit", HTTP_GET,  []() { handleFile ("/animations-edit.html"); } );
   server.on("/animations/edit", HTTP_POST, handleSaveAnimation);
-  server.on("/patterns",        HTTP_GET,  []() { handleFile ("/patterns.html"); } );
-  server.on("/patterns/edit",   HTTP_GET,  []() { handleFile ("/patterns-edit.html"); } );
-  server.on("/patterns/edit",   HTTP_POST, handleSavePattern);
   server.on("/settings",        HTTP_GET,  []() { handleFile ("/settings.html"); } );
   
   server.onNotFound([]() {
@@ -432,17 +371,7 @@ void setup(void)
   server.begin();
   Serial.println("HTTP server started");
 
-
-  for (int i=0; i<NUM_LEDS; i++) {
-    leds[i] = RGB(0xAA,0xAA,0xAA);
-  }
-  leds[0] = RGB(255,0,0);
-  leds[1] = RGB(0,255,0);
-  leds[2] = RGB(0,0,255);
-
-  t = millis();
-
-  //playAnimation("example");
+  playAnimation("example");
 }
 
 
@@ -451,12 +380,8 @@ void loop(void)
   server.handleClient();
   MDNS.update();
 
-  uint32_t dt = millis() - t;
-
-  //animate(dt);
+  animate(millis() );
   
   // TODO prepare next frame here
   sendLEDs();
-
-  t = millis();
 }

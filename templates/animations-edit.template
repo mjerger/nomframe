@@ -2,7 +2,7 @@
     var mode = "create";
     var currentName = "";
     var loadAnimation = function(name) {
-      get("/a/" + name + ".lua", function(content) {
+      getText("/a/" + name + ".json", function(content) {
         $("#animation").val(content);
         $("#overlay").hide();
       });

@@ -12,7 +12,6 @@ void errorLoop() {
   }
 }
 
-
 String getContentType(String filename)
 {
   if (filename.endsWith(".html") || filename.endsWith(".htm")) return "text/html";
@@ -23,13 +22,11 @@ String getContentType(String filename)
   return "text/plain";
 }
 
-
 String leadingZero(int num)
 {
   if (num < 10) return "0" + String(num);
   return String(num);
 }
-
 
 bool sendJson(DynamicJsonDocument json)
 {
@@ -39,13 +36,11 @@ bool sendJson(DynamicJsonDocument json)
   return true;
 }
 
-
 bool sendOK()
 {
   server.send(200);
   return true;
 }
-
 
 bool sendRedirect(String location)
 {
@@ -54,9 +49,15 @@ bool sendRedirect(String location)
   return true;
 }
 
-
 bool sendError()
 {
   server.send(500, "text/plain", "500: Internal Server Error");
   return true;
+}
+
+double clamp(double value, double min, double max)
+{
+  if (value > max) return max;
+  if (value < min) return min;
+  return value;
 }

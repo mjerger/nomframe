@@ -30,9 +30,6 @@
               <a class="nav-link active" href="/animations">Animations</a>
             </li>
             <li class="nav-item mx-4">
-              <a class="nav-link active" href="/patterns">Patterns</a>
-            </li>
-            <li class="nav-item mx-4">
               <a class="nav-link active" href="/settings">Settings</a>
             </li>
           </ul>
@@ -84,11 +81,6 @@
         postJson("/r/action", json);
       }
 
-      var playPattern = function(pattern) {
-        var json = { "action" : "play", "pattern" : pattern };
-        postJson("/r/action", json);
-      }
-
       var width=0; var height=0;
       var initLEDTable = function(width, height) {
         $("#leds").empty();
@@ -110,14 +102,13 @@
           initLEDTable(widht, height);
         });
       }
-
-      var setPattern = function(bytes) {
+      var setLEDs = function(bytes) {
         for (var i=0; i<bytes.byteLength; i+=3) {
-            var r = byteToHex(bytes[i]);
-            var g = byteToHex(bytes[i+1]);
-            var b = byteToHex(bytes[i+2]);
-            $("#" + i/3).css("background-color", "#"+r+g+b);
-          };
+          var r = byteToHex(bytes[i]);
+          var g = byteToHex(bytes[i+1]);
+          var b = byteToHex(bytes[i+2]);
+          $("#" + i/3).css("background-color", "#"+r+g+b);
+        };
       }
 
       var byteToHex = function(byte) {
@@ -148,7 +139,7 @@
     var mode = "create";
     var currentName = "";
     var loadAnimation = function(name) {
-      get("/a/" + name + ".lua", function(content) {
+      getText("/a/" + name + ".json", function(content) {
         $("#animation").val(content);
         $("#overlay").hide();
       });

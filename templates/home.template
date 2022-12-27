@@ -10,10 +10,10 @@
         $("#overlay").hide();
       }
 
-      var updatePattern = function() {
+      var updateLEDs = function() {
         getData("/leds", function(data) {
           var bytes = new Uint8Array(data);
-          setPattern(bytes);
+          setLEDs(bytes);
         });
       }
 
@@ -21,7 +21,7 @@
         updateSysInfo();
         initLEDs();
         setInterval(updateSysInfo, 5000);
-        setInterval(updatePattern, 1000);
+        setInterval(updateLEDs, 1000);
         $("#reboot").click(function() { sendJson("/r/action", { "action" : "reboot" }); });
       });
     </script>

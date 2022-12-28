@@ -345,8 +345,8 @@ void loop(void) {
     t = millis() / 1000.0;
     for (int x_i = 0; x_i < 16; x_i++) {
       for (int y_i = 0; y_i < 16; y_i++) {
-        x = ((double)x_i - 8.0) / 8.0; // -1 .. +1
-        y = ((double)y_i - 8.0) / 8.0; // -1 .. +1
+        x = ((double)x_i - 7.5) / 7.5; // -1 .. +1
+        y = ((double)y_i - 7.5) / 7.5; // -1 .. +1
         v = te_eval(expr);             // -1 .. +1
         leds[ledMap(x_i, y_i)] = rgbMap(v);
       }

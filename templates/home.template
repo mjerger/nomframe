@@ -13,6 +13,7 @@
       var updateLEDs = function() {
         getData("/leds", function(data) {
           var bytes = new Uint8Array(data);
+          console.log(bytes);
           setLEDs(bytes);
         });
       }
@@ -20,8 +21,8 @@
       $(document).ready( function() {
         updateSysInfo();
         initLEDs();
-        setInterval(updateSysInfo, 5000);
-        setInterval(updateLEDs, 1000);
+        setInterval(updateSysInfo, 10000);
+        setInterval(updateLEDs, 2000);
         $("#reboot").click(function() { sendJson("/r/action", { "action" : "reboot" }); });
       });
     </script>

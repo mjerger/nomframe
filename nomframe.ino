@@ -17,13 +17,11 @@
 #include "ESP8266_ISR_Timer.h"
 #include <time.h>
 #include "tinyexpr.h"
+#include "utils.h"
 
+// secrets
+#include "config.h"
 
-// WIFI HTTP server
-
-const char *ssid = "2rw";
-const char *password = "Handschuhfachbeleuchtungsschalter!";
-const char *mdnsHostname = "nomframe";
 const String methods[8]{ "ANY", "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" };
 ESP8266WebServer server(80);
 File uploadFile;
@@ -38,13 +36,17 @@ const String weekdays[7]{ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"
 
 // LEDs
 
-#define BRIGHTNESS 32
+#define MAX_BRIGHTNESS 128
 #define FPS 30
 #define WIDTH 16
 #define HEIGHT 16
 #define NUM_LEDS (WIDTH * HEIGHT)
 CRGB leds[NUM_LEDS];
-#define LED_PIN 5
+#define LED_PIN 4
+
+// State
+boolean ledsEnabled = true;
+int ledBrightness = 50; // percent
 
 // Animations
 
@@ -60,7 +62,8 @@ CRGBPalette16 palette = RainbowColors_p;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void playAnimation(String animation) {
+void playAnimation(String animation) 
+{
   String path = (animation.startsWith("/a/") ? animation : "/a/" + animation) + ".json";
 
   if (SPIFFS.exists(path) == false) {
@@ -97,21 +100,24 @@ CRGB rgbMap(double value) {
 }
 
 // Linear map between two ranges
-double map(double in, double in_from, double in_to, double out_from, double out_to) {
+double map(double in, double in_from, double in_to, double out_from, double out_to) 
+{
   double out = (in - in_from) / (in_to - in_from);
   out = out * (out_to - out_from) + out_from;
   return out;
 }
 
 // Zig-Zag LED panel pattern
-uint16_t ledMap(int x, int y) {
+uint16_t ledMap(int x, int y) 
+{
   if (y % 2) x = WIDTH - 1 - x;
   return y * WIDTH + x;
 }
 
 
 // Response with file from FS
-bool handleFile(String path) {
+bool handleFile(String path) 
+{
   String contentType = getContentType(path);
   String pathWithGz = path + ".gz";
 
@@ -132,7 +138,8 @@ bool handleFile(String path) {
 
 
 // Handle the /r rest endpoints
-bool handleREST() {
+bool handleREST()
+{
   if (!server.uri().startsWith("/r/")) return false;
 
   String path = server.uri().substring(3);
@@ -165,7 +172,7 @@ bool handleREST() {
     }
   }
   // ACTIONS - perform various actions
-  else if (path == String("action")) {
+  else if (path == "action") {
 
     if (method == HTTP_POST && server.hasArg("plain")) {
       deserializeJson(json, server.arg("plain"));
@@ -184,7 +191,8 @@ bool handleREST() {
         }
       }
     }
-  } else if (path == String("sysinfo")) {
+  // SYSINFO
+  } else if (path == "sysinfo") {
     // Uptime
     json["uptime"] = uptime_formatter::getUptime();
 
@@ -213,18 +221,56 @@ bool handleREST() {
     json["height"] = WIDTH;
 
     return sendJson(json);
+
+  // Turn ON LEDs
+  } else if (path == "on") {
+    ledsEnabled = true;
+    return sendOK();
+  
+  // Turn OFF LEDs
+  } else if (path == "off") {
+    ledsEnabled = false;
+    fill_solid(leds, NUM_LEDS, CRGB::Black);
+    FastLED.show();
+    return sendOK();
+
+  // FLIP LED status
+  } else if (path == "flip") {
+    if (ledsEnabled) {
+      ledsEnabled = false;
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
+    } else {
+      ledsEnabled = true;
+    }
+    return sendOK();
+  
+  // Set outpout brightness
+  } else if (path == "brightness") {
+    int val = server.arg("val").toInt();
+    setBrightness(val);
+    if (val == 0) {
+      ledsEnabled = false;
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
+    } else {
+      ledsEnabled = true;
+    }
+    return sendOK();
   }
 
   return false;
 }
 
 
-void handleGetLEDs() {
+void handleGetLEDs()
+{
   server.send(200, "application/octet-stream", (const char *)&leds, NUM_LEDS * 3);
 }
 
 
-bool handleSaveAnimation() {
+bool handleSaveAnimation()
+{
   if (server.hasArg("animation") && server.hasArg("name")) {
     String name = String(server.arg("name"));
     name.replace(" ", "_");
@@ -238,6 +284,45 @@ bool handleSaveAnimation() {
     return sendRedirect("/animations/edit?a=" + name);
   }
   return sendError();
+}
+
+
+bool sendJson(DynamicJsonDocument json)
+{
+  String string;
+  serializeJson(json, string);
+  server.send(200, "application/json", string);
+  return true;
+}
+
+
+bool sendOK()
+{
+  server.send(200);
+  return true;
+}
+
+
+bool sendRedirect(String location)
+{
+  server.sendHeader("Location", location);
+  server.send(303);
+  return true;
+}
+
+
+bool sendError()
+{
+  server.send(500, "text/plain", "500: Internal Server Error");
+  return true;
+}
+
+
+void setBrightness(int val)
+{
+  val = min(MAX_BRIGHTNESS, max(0, val));
+  ledBrightness = val;
+  FastLED.setBrightness((double)(val)/ 100.0 * (double)MAX_BRIGHTNESS);
 }
 
 
@@ -262,11 +347,8 @@ void setup(void) {
 
   // LEDs
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.setBrightness(BRIGHTNESS);
+  setBrightness(42);
   FastLED.setMaxPowerInVoltsAndMilliamps(5,5000);
-  fill_solid(leds, NUM_LEDS, CRGB::Black);
-  leds[0] = CRGB::Green;
-  FastLED.show();
 
   // Connect to WIFI
   WiFi.mode(WIFI_STA);
@@ -330,31 +412,35 @@ void loop(void) {
   server.handleClient();
   MDNS.update();
 
-  // Process animation
-  static double x, y, t, v;
-  static te_variable vars[] = { { "x", &x }, { "y", &y }, { "t", &t } };
-  static int err;
-  static te_expr *expr = 0;
-  if (reloadExpr) {
-    te_free(expr);
-    expr = 0;
-    reloadExpr = false;
-  }
-  if (!expr) expr = te_compile(playing.data.c_str(), vars, 3, &err);
-  if (expr) {
-    t = millis() / 1000.0;
-    for (int x_i = 0; x_i < 16; x_i++) {
-      for (int y_i = 0; y_i < 16; y_i++) {
-        x = ((double)x_i - 7.5) / 7.5; // -1 .. +1
-        y = ((double)y_i - 7.5) / 7.5; // -1 .. +1
-        v = te_eval(expr);             // -1 .. +1
-        leds[ledMap(x_i, y_i)] = rgbMap(v);
+  if (ledsEnabled) {
+  
+    // Process animation
+    static double x, y, t, v;
+    static te_variable vars[] = { { "x", &x }, { "y", &y }, { "t", &t } };
+    static int err;
+    static te_expr *expr = 0;
+    if (reloadExpr) {
+      te_free(expr);
+      expr = 0;
+      reloadExpr = false;
+    }
+    if (!expr) expr = te_compile(playing.data.c_str(), vars, 3, &err);
+    if (expr) {
+      t = millis() / 1000.0;
+      for (int x_i = 0; x_i < 16; x_i++) {
+        for (int y_i = 0; y_i < 16; y_i++) {
+          x = ((double)x_i - 7.5) / 7.5; // -1 .. +1
+          y = ((double)y_i - 7.5) / 7.5; // -1 .. +1
+          v = te_eval(expr);             // -1 .. +1
+          leds[ledMap(x_i, y_i)] = rgbMap(v);
+        }
       }
     }
+  
+    exprError = !expr;
+    
   }
-
-  exprError = !expr;
-
+  
   // Output
-  FastLED.delay(1000/FPS);
+  FastLED.delay(1000/FPS);  
 }

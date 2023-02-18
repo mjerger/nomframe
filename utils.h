@@ -1,6 +1,7 @@
 
 // Loop and blink forever
-void errorLoop() {
+void errorLoop() 
+{
   while (true) {
     for (int i=0; i<3; i++) {
       digitalWrite(LED_BUILTIN, LOW);
@@ -26,33 +27,6 @@ String leadingZero(int num)
 {
   if (num < 10) return "0" + String(num);
   return String(num);
-}
-
-bool sendJson(DynamicJsonDocument json)
-{
-  String string;
-  serializeJson(json, string);
-  server.send(200, "application/json", string);
-  return true;
-}
-
-bool sendOK()
-{
-  server.send(200);
-  return true;
-}
-
-bool sendRedirect(String location)
-{
-  server.sendHeader("Location", location);
-  server.send(303);
-  return true;
-}
-
-bool sendError()
-{
-  server.send(500, "text/plain", "500: Internal Server Error");
-  return true;
 }
 
 double clamp(double value, double min, double max)

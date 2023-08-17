@@ -333,7 +333,7 @@ void setup(void) {
   
   delay(100);
   Serial.println("\n\n--------------");
-  Serial.println(" nomframe 1.0");
+  Serial.println(" nomframe 1.1");
   Serial.println("--------------");
 
   Serial.print("Initializing SPIFFS ... ");
@@ -346,8 +346,8 @@ void setup(void) {
 
   // LEDs
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
-  setBrightness(75);
   FastLED.setMaxPowerInVoltsAndMilliamps(5,5000);
+  setBrightness(100);
 
   // Connect to WIFI
   WiFi.mode(WIFI_STA);

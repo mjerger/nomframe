@@ -27,7 +27,6 @@ ESP8266WebServer server(80);
 File uploadFile;
 
 // NTP
-
 #define MY_NTP_SERVER "at.pool.ntp.org"
 #define MY_TZ "CET-1CEST,M3.5.0,M10.5.0/3"
 time_t now;
@@ -35,7 +34,6 @@ tm tm;
 const String weekdays[7]{ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
 // LEDs
-
 #define MAX_BRIGHTNESS 128
 #define FPS 30
 #define WIDTH 16
@@ -44,12 +42,12 @@ const String weekdays[7]{ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"
 CRGB leds[NUM_LEDS];
 #define LED_PIN 4
 
-// State
 boolean ledsEnabled = true;
-int ledBrightness = 50; // percent
+
+//#define SERIAL_ENABLED
+
 
 // Animations
-
 struct Playing {
   String animation = "";
   String data = "";
@@ -64,7 +62,7 @@ CRGBPalette16 palette = RainbowColors_p;
 
 void playAnimation(String animation) 
 {
-  String path = (animation.startsWith("/a/") ? animation : "/a/" + animation) + ".json";
+  String path = (animation.startsWith("/ani/") ? animation : "/ani/" + animation) + ".json";
 
   if (SPIFFS.exists(path) == false) {
     return;
@@ -160,9 +158,9 @@ bool handleREST()
   // ANIMATIONS - list all animations
   else if (path == "animations") {
     if (method == HTTP_GET) {
-      Dir dir = SPIFFS.openDir("/a/");
+      Dir dir = SPIFFS.openDir("/ani/");
       while (dir.next()) {
-        String filename = dir.fileName().substring(3);
+        String filename = dir.fileName().substring(5);
         if (filename.endsWith(".json")) {
           filename = filename.substring(0, filename.length() - 5);
           json[filename] = dir.fileSize();
@@ -275,7 +273,7 @@ bool handleSaveAnimation()
     String name = String(server.arg("name"));
     name.replace(" ", "_");
 
-    String filename = "/a/" + name + ".json";
+    String filename = "/ani/" + name + ".json";
     File file = SPIFFS.open(filename, "w");
     String data = server.arg("animation");
     file.write(data.c_str(), data.length());
@@ -321,7 +319,6 @@ bool sendError()
 void setBrightness(int val)
 {
   val = min(MAX_BRIGHTNESS, max(0, val));
-  ledBrightness = val;
   FastLED.setBrightness((double)(val)/ 100.0 * (double)MAX_BRIGHTNESS);
 }
 
@@ -330,9 +327,11 @@ void setup(void) {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  Serial.begin(115200);
-
-  delay(500);
+  #ifdef SERIAL_ENABLED
+    Serial.begin(115200);
+  #endif
+  
+  delay(100);
   Serial.println("\n\n--------------");
   Serial.println(" nomframe 1.0");
   Serial.println("--------------");
@@ -347,7 +346,7 @@ void setup(void) {
 
   // LEDs
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
-  setBrightness(42);
+  setBrightness(75);
   FastLED.setMaxPowerInVoltsAndMilliamps(5,5000);
 
   // Connect to WIFI

@@ -101,12 +101,20 @@
           initLEDTable(width, height);
         });
       }
+      // Zig-Zag LED panel pattern
+      var mapPos = function(i) {
+        x = i%width;
+        y = Math.floor(i/16)
+        if (y % 2) x = width - 1 - x;
+        return y * width + x;
+      }
       var setLEDs = function(bytes) {
         for (var i=0; i<bytes.byteLength; i+=3) {
           var r = byteToHex(bytes[i]);
           var g = byteToHex(bytes[i+1]);
           var b = byteToHex(bytes[i+2]);
-          $("#" + i/3).css("background-color", "#"+r+g+b);
+          var idx = mapPos(i/3);
+          $("#" + idx).css("background-color", "#"+r+g+b);
         };
       }
 

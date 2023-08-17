@@ -1,0 +1,1 @@
+{ "f" : "abs(sin(10*x+sin(t)*3)+sin(10*y+cos(t)*3))/2" }

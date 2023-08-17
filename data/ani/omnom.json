@@ -1,0 +1,1 @@
+{ "f" : "abs(y*y+t)+abs(x*x+t/3)+abs(y*x+t/5)" }
